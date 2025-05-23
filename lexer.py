@@ -1,3 +1,9 @@
+# --------------------------------------------------------------
+# Etapa 1: Análisis Lexicográfico
+# Proyecto: Traductor de Lenguaje Imperativo al Lenguaje del Lamba Cálculo
+# Estudiantes: Néstor Herrera (18-10786) y Luis Isea (19-10175)
+# --------------------------------------------------------------
+
 import ply.lex as lex
 import ply.yacc as yacc
 
@@ -11,14 +17,59 @@ tokens = (
 'TkCBracket', 'TkTwoPoints', 'TkApp',
 )
 
-# Definiciones de Tokens
+# Definiciones de Tokens para separadores
+t_TkOBlock = r'\{'
+t_TkCBlock = r'\}'
+t_TkSoForth = r'\.\.'
+t_TkComma = r','
+t_TkOpenPar = r'\('
+t_TkClosePar = r'\)'
+t_TkAsig = r':='
+t_TkSemicolon = r';'
+t_TkArrow = r'-->'
+t_TkGuard = r'\[\]'
+
+# Definiciones de Tokens para operadores
 t_TkPlus = r'\+'
 t_TkMinus = r'-'
 t_TkMult = r'\*'
-t_TkAsig = r':='
-t_TkOpenPar = r'\('
-t_TkClosePar = r'\)'
+t_TkOr = r'or'
+t_TkAnd = r'and'
+t_TkNot = r'!'
+t_TkLess = r'<'
+t_TkLeq = r'<='
+t_TkGeq = r'>='
+t_TkGreater = r'>'
+t_TkEqual = r'=='
+t_TkNEqual = r'<>'
+t_TkOBracket = r'\['
+t_TkCBracket = r'\]'
+t_TkTwoPoints = r':'
+t_TkApp = r'\.'
+
+# Definiciones de Tokens para palabras reservadas
+t_TkIf = r'if'
 t_TkInt = r'int'
+t_TkWhile = r'while'
+t_TkEnd = r'end'
+t_TkPrint = r'print'
+t_TkFunction = r'function'
+t_TkTrue = r'true'
+t_TkFalse = r'false'
+
+# Definiciones de Tokens para identificadores y cadenas
+def t_TkId(t):
+    r'[a-zA-Z_][a-zA-Z0-9_]*'
+    if t.value in tokens:
+        t.type = t.value
+    else:
+        t.type = 'TkId'
+    return t
+# todo lo que no sea un token conocido y sea alfa-numérico sin comillas lo consideramos un identificador?
+# t_TkId = r'[a-zA-Z_][a-zA-Z0-9_]*' # Regex para identificadores alfanuméricos
+
+# Definiciones de Tokens para cadenas de texto
+t_TkString = r'\"([^\\\"]|\\.)*\"' # Regex para cadenas de texto con comillas dobles
 
 # Conversion al leer numeros enteros
 def t_TkNum(t):
@@ -39,6 +90,6 @@ def t_error(t):
 
 lex.lex()
 
-lex.input("2+3")
+lex.input('int a;\na := {[2+(3*5)]} and "Hiiii"')
 for tok in iter(lex.token, None):
     print(repr(tok.type), repr(tok.value))
