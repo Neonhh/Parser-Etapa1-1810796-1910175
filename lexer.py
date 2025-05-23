@@ -7,15 +7,18 @@
 import ply.lex as lex
 import ply.yacc as yacc
 
-tokens = (
-'TkIf','TkWhile','TkEnd', 'TkInt', 'TkPrint', 'TkFunction', 
-'TkId', 'TkNum', 'TkString', 'TkTrue', 'TkFalse',
+# Se especifican las palabras reservadas para distinguirlas de los tokens que representan variables
+reserved = {'or':'TkOr', 'and':'TkAnd', 'if':'TkIf', 'int': 'TkInt', 'while':'TkWhile',
+            'end':'TkEnd','print':'TkPrint','function':'TkFunction','true':'TkTrue','false':'TkFalse'}
+
+tokens = list(reserved.values()) + [
+'TkId', 'TkNum', 'TkString', 
 'TkOBlock', 'TkCBlock', 'TkSoForth', 'TkComma', 'TkOpenPar',
 'TkClosePar', 'TkAsig', 'TkSemicolon', 'TkArrow', 'TkGuard',
-'TkPlus', 'TkMinus', 'TkMult', 'TkOr', 'TkAnd', 'TkNot', 'TkLess',
+'TkPlus', 'TkMinus', 'TkMult', 'TkNot', 'TkLess',
 'TkLeq', 'TkGeq', 'TkGreater', 'TkEqual', 'TkNEqual', 'TkOBracket',
 'TkCBracket', 'TkTwoPoints', 'TkApp',
-)
+]
 
 # Definiciones de Tokens para separadores
 t_TkOBlock = r'\{'
@@ -60,10 +63,10 @@ t_TkFalse = r'false'
 # Definiciones de Tokens para identificadores y cadenas
 def t_TkId(t):
     r'[a-zA-Z_][a-zA-Z0-9_]*'
-    if t.value in tokens:
-        t.type = t.value
-    else:
-        t.type = 'TkId'
+    
+    
+
+    t.type = reserved.get(t.value,'TkId')
     return t
 # todo lo que no sea un token conocido y sea alfa-numérico sin comillas lo consideramos un identificador?
 # t_TkId = r'[a-zA-Z_][a-zA-Z0-9_]*' # Regex para identificadores alfanuméricos
