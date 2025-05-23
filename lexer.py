@@ -64,9 +64,8 @@ t_TkFalse = r'false'
 def t_TkId(t):
     r'[a-zA-Z_][a-zA-Z0-9_]*'
     
-    
-
     t.type = reserved.get(t.value,'TkId')
+    
     return t
 # todo lo que no sea un token conocido y sea alfa-numérico sin comillas lo consideramos un identificador?
 # t_TkId = r'[a-zA-Z_][a-zA-Z0-9_]*' # Regex para identificadores alfanuméricos
@@ -91,11 +90,29 @@ def t_newline(t):
     t.lexer.lineno += t.value.count("\n")
 
 def t_error(t):
-    print("Illegal character '%s'" % t.value[0])
+    global has_errors 
+    # Buscar el último salto de línea antes del error (t.lexpos)
+    last_newline = t.lexer.lexdata.rfind('\n', 0, t.lexpos)
+    column = (t.lexpos - last_newline - 1) if last_newline >= 0 else t.lexpos
+
+    print(f"Error: Unexpected character \"{t.value[0]}\" in row {t.lineno}, column {column}")
+
     t.lexer.skip(1)
 
-lex.lex()
 
-lex.input('int a;\na := {[2+(3*5)]} and "Hiiii"//Te comento:\nfunction 2[..]')
+lexer = lex.lex()
+
+lex.input("{\nint a, b, c;\nfunction[..2] d, e, f;\na := b + 3;\nprint e\n// Esto es un comentario. Debe ser ignorado.\n}")
 for tok in iter(lex.token, None):
-    print(repr(tok.type), repr(tok.value))
+    tokId = tok.type
+
+#Cambia la forma de representar estos tokens para que coincida con el output esperado
+    if tokId == 'TkId':
+        tokId = f"{tokId}(\"{tok.value}\")"
+    elif tokId == 'TkNum':
+        tokId = f"{tokId}({tok.value})"
+    # Busca el último salto de línea antes de `lexpos`
+    last_break = lexer.lexdata.rfind('\n', 0, tok.lexpos)
+    column = tok.lexpos - last_break - 1 if last_break >= 0 else tok.lexpos
+
+    print(f"{tokId} {tok.lineno} {column}")
