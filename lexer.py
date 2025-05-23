@@ -83,6 +83,9 @@ def t_TkNum(t):
 # Caracteres a ignorar
 t_ignore = " \t"
 
+# Comentarios
+t_ignore_COMMENT = r'//.*'
+
 def t_newline(t):
     r'\n+'
     t.lexer.lineno += t.value.count("\n")
@@ -93,6 +96,6 @@ def t_error(t):
 
 lex.lex()
 
-lex.input('int a;\na := {[2+(3*5)]} and "Hiiii"')
+lex.input('int a;\na := {[2+(3*5)]} and "Hiiii"//Te comento:\nfunction 2[..]')
 for tok in iter(lex.token, None):
     print(repr(tok.type), repr(tok.value))
