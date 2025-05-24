@@ -8,8 +8,9 @@ import ply.lex as lex
 import sys
 
 # Se especifican las palabras reservadas para distinguirlas de los tokens que representan variables
-reserved = {'or':'TkOr', 'and':'TkAnd', 'if':'TkIf', 'int': 'TkInt', 'while':'TkWhile',
-            'end':'TkEnd','print':'TkPrint','function':'TkFunction','true':'TkTrue','false':'TkFalse'}
+reserved = {'or':'TkOr', 'and':'TkAnd', 'if':'TkIf', 'fi':'TkFi', 'int': 'TkInt', 'while':'TkWhile',
+            'end':'TkEnd','print':'TkPrint','function':'TkFunction', 'bool': 'TkBool', 'true':'TkTrue',
+            'false':'TkFalse', 'skip': 'TkSkip'}
 
 tokens = list(reserved.values()) + [
 'TkId', 'TkNum', 'TkString', 
@@ -52,13 +53,16 @@ t_TkApp = r'\.'
 
 # Definiciones de Tokens para palabras reservadas
 t_TkIf = r'if'
+t_TkFi = r'fi'
 t_TkInt = r'int'
 t_TkWhile = r'while'
 t_TkEnd = r'end'
 t_TkPrint = r'print'
+t_TkBool = r'bool'
 t_TkFunction = r'function'
 t_TkTrue = r'true'
 t_TkFalse = r'false'
+t_TkSkip = r'skip'
 
 # Definiciones de Tokens para identificadores y cadenas
 def t_TkId(t):
@@ -71,7 +75,9 @@ def t_TkId(t):
 # t_TkId = r'[a-zA-Z_][a-zA-Z0-9_]*' # Regex para identificadores alfanuméricos
 
 # Definiciones de Tokens para cadenas de texto
-t_TkString = r'\"([^\\\"]|\\.)*\"' # Regex para cadenas de texto con comillas dobles
+t_TkString = r'\"([^\\\"\n]|\\([\\n\"]))*\"' # Regex para cadenas de texto con comillas dobles
+# Lado derecho de |: Caracteres no escapables (No se permiten saltos de linea dentro de string)
+# Lado izquierdo: Caracteres escapados (Solo se pueden escapar \, \n y ")
 
 # Conversion al leer numeros enteros
 def t_TkNum(t):
@@ -140,7 +146,7 @@ def main():
             #Cambia la forma de representar estos tokens para que coincida con el output esperado
             if tokId == 'TkId':
                 tokId = f"{tokId}(\"{tok.value}\")"
-            elif tokId == 'TkNum':
+            elif tokId == 'TkNum' or tokId == 'TkString':
                 tokId = f"{tokId}({tok.value})"
             
             # Busca el último salto de línea antes de `lexpos`
