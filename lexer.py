@@ -5,7 +5,7 @@
 # --------------------------------------------------------------
 
 import ply.lex as lex
-import ply.yacc as yacc
+import sys
 
 # Se especifican las palabras reservadas para distinguirlas de los tokens que representan variables
 reserved = {'or':'TkOr', 'and':'TkAnd', 'if':'TkIf', 'int': 'TkInt', 'while':'TkWhile',
@@ -89,30 +89,75 @@ def t_newline(t):
     r'\n+'
     t.lexer.lineno += t.value.count("\n")
 
+# Se crea una clase para almacenar mensajes de error, en caso de haberlos
+class LexerState:
+    def __init__(self):
+        self.errors = []
+        self.valid = True  # Indica si hay errores
+
+state = LexerState()
+
 def t_error(t):
-    global has_errors 
     # Buscar el último salto de línea antes del error (t.lexpos)
     last_newline = t.lexer.lexdata.rfind('\n', 0, t.lexpos)
-    column = (t.lexpos - last_newline - 1) if last_newline >= 0 else t.lexpos
+    column = (t.lexpos - last_newline) if last_newline >= 0 else t.lexpos + 1
 
-    print(f"Error: Unexpected character \"{t.value[0]}\" in row {t.lineno}, column {column}")
+    state.errors.append(f"Error: Unexpected character \"{t.value[0]}\" in row {t.lineno}, column {column}")
+    state.valid = False
 
     t.lexer.skip(1)
 
+def main():
 
-lexer = lex.lex()
+    # Procesamiento del input por consola 
+    if len(sys.argv) != 2:
+        print("Uso: python lexer.py <archivo.imperat>")
+        sys.exit(1)
 
-lex.input("{\nint a, b, c;\nfunction[..2] d, e, f;\na := b + 3;\nprint e\n// Esto es un comentario. Debe ser ignorado.\n}")
-for tok in iter(lex.token, None):
-    tokId = tok.type
+    filename = sys.argv[1]
+    
+    # Chequear que el archivo tenga extensión .imperat
+    if not filename.endswith('.imperat'):
+        print("Error: El archivo debe tener extensión .imperat")
+        sys.exit(1)
 
-#Cambia la forma de representar estos tokens para que coincida con el output esperado
-    if tokId == 'TkId':
-        tokId = f"{tokId}(\"{tok.value}\")"
-    elif tokId == 'TkNum':
-        tokId = f"{tokId}({tok.value})"
-    # Busca el último salto de línea antes de `lexpos`
-    last_break = lexer.lexdata.rfind('\n', 0, tok.lexpos)
-    column = tok.lexpos - last_break - 1 if last_break >= 0 else tok.lexpos
+    try:
+        # Lee el contenido del archivo
+        with open(filename, 'r', encoding='utf-8') as file:
+            data = file.read()
 
-    print(f"{tokId} {tok.lineno} {column}")
+        lexer = lex.lex()
+
+        lex.input(data)
+
+        # Almacenamos aqui la informacion de tokens en lugar de imprimir directamente.
+        # Esto para poder evitar que se muestren tokens en caso de error
+        foundTokens = []
+            
+        for tok in iter(lex.token, None):
+            tokId = tok.type
+
+            #Cambia la forma de representar estos tokens para que coincida con el output esperado
+            if tokId == 'TkId':
+                tokId = f"{tokId}(\"{tok.value}\")"
+            elif tokId == 'TkNum':
+                tokId = f"{tokId}({tok.value})"
+            
+            # Busca el último salto de línea antes de `lexpos`
+            last_break = lexer.lexdata.rfind('\n', 0, tok.lexpos)
+            column = tok.lexpos - last_break if last_break >= 0 else tok.lexpos + 1
+
+            foundTokens.append(f"{tokId} {tok.lineno} {column}")
+        
+        if state.valid:
+            print("\n".join(foundTokens))
+        else:
+            print("\n".join(state.errors))
+    
+    except FileNotFoundError:
+        print(f"Error: El archivo '{filename}' no existe.")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
