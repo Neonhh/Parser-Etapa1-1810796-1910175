@@ -7,6 +7,10 @@
 import ply.lex as lex
 import sys
 
+# Almacenamos aqui la informacion de tokens en lugar de imprimir directamente.
+# Esto para poder evitar que se muestren tokens en caso de error
+foundTokens = []
+
 # Se especifican las palabras reservadas para distinguirlas de los tokens que representan variables
 reserved = {'or':'TkOr', 'and':'TkAnd', 'if':'TkIf', 'fi':'TkFi', 'int': 'TkInt', 'while':'TkWhile',
             'end':'TkEnd','print':'TkPrint','function':'TkFunction', 'bool': 'TkBool', 'true':'TkTrue',
@@ -113,6 +117,8 @@ def t_error(t):
 
     t.lexer.skip(1)
 
+lexer = lex.lex()
+
 def main():
 
     # Procesamiento del input por consola 
@@ -132,13 +138,7 @@ def main():
         with open(filename, 'r', encoding='utf-8') as file:
             data = file.read()
 
-        lexer = lex.lex()
-
         lex.input(data)
-
-        # Almacenamos aqui la informacion de tokens en lugar de imprimir directamente.
-        # Esto para poder evitar que se muestren tokens en caso de error
-        foundTokens = []
             
         for tok in iter(lex.token, None):
             tokId = tok.type
