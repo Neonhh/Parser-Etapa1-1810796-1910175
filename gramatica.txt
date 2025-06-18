@@ -1,0 +1,80 @@
+# --------------------------------------------------------------
+# Etapa 2: Análisis Sintáctico con Árbol Sintáctico
+# Proyecto: Traductor de Lenguaje Imperativo al Lenguaje del Lamba Cálculo
+# Estudiantes: Néstor Herrera (18-10786) y Luis Isea (19-10175)
+# --------------------------------------------------------------
+
+# Gramática libre de contexto para reconocer GCL
+
+# Símbolo inicial
+S -> Block
+
+Block -> TkOBlock Sequencing TkCBlock
+
+Sequencing -> Statement
+            | Statement TkSemicolon Sequencing
+
+Statement -> Declare
+           | Asig
+           | Print
+           | Skip
+           | If
+           | While
+
+Declare -> TkInt DeclareIdList
+         | TkBool DeclareIdList
+         | TkFunction TkOBracket TkSoForth TkNum TkCBracket DeclareIdList
+
+DeclareIdList -> TkId
+               | TkId TkComma DeclareIdList
+
+Asig -> TkId TkAsig Expr
+
+Print -> TkPrint Expr
+
+Skip -> TkSkip
+
+While -> TkWhile Expr TkArrow Sequencing TkEnd
+
+If -> TkIf GuardList TkFi
+
+GuardList -> Guard
+           | Guard GuardList
+
+Guard -> Expr TkArrow Sequencing
+       | TkGuard Expr TkArrow Sequencing
+
+Expr -> Expr TkPlus Expr
+      | Expr TkMinus Expr
+      | Expr TkMult Expr
+      | Expr TkAnd Expr
+      | Expr TkOr Expr
+      | Expr TkEqual Expr
+      | Expr TkNEqual Expr
+      | Expr TkLess Expr
+      | Expr TkGreater Expr
+      | Expr TkLeq Expr
+      | Expr TkGeq Expr
+      | Expr TkComma Expr
+      | Expr TkTwoPoints Expr
+      | TkMinus Expr %prec UMINUS
+      | TkNot Expr
+      | Atom
+
+Atom -> Atom TkApp Simple
+      | Simple
+
+Simple -> TkId
+        | TkNum
+        | TkTrue
+        | TkFalse
+        | TkString
+        | Atom TkOpenPar Expr TkClosePar
+        | TkOpenPar Expr TkClosePar
+
+# Notas:
+# - Los tokens como TkId, TkNum, TkString, etc., deben estar definidos en el lexer.
+# - %prec UMINUS se usa para distinguir el menos unario.
+# - La precedencia y asociatividad de operadores se define en el parser de PLY.
+# - Los bloques pueden anidarse.
+# - Las listas de declaraciones y sentencias pueden estar vacías.
