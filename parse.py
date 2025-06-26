@@ -30,6 +30,7 @@ def p_S(p):
 
 def p_B(p):
     "B : TkOBlock opt_stmt_list TkCBlock"
+    #print("Parsed block:", p[2])
     p[0] = ("block", p[2])
 
 
@@ -46,8 +47,10 @@ def p_stmt_list(p):
     """stmt_list : statement
     | statement TkSemicolon stmt_list"""
     if len(p) == 2:
+        #print("Parsed single statement:", p[1])
         p[0] = [p[1]]
     else:
+        #print("Parsed statement list with semicolon:", p[1], p[3])
         p[0] = [p[1]] + p[3]
 
 
@@ -58,6 +61,7 @@ def p_statement(p):
     | skip_stmt
     | if_stmt
     | while_stmt"""
+    #print("Parsed statement:", p[1])
     p[0] = p[1]
 
 
@@ -230,7 +234,7 @@ def p_error(p):
 parser = yacc.yacc(debug=False, write_tables=False)
 
 
-def print_ast(node, indent=0):
+def print_ast(node, indent=0, sequenced=False):
     prefix = "-" * indent
     if isinstance(node, tuple):
         tag = node[0]
@@ -239,15 +243,17 @@ def print_ast(node, indent=0):
             print(f"{prefix}Block")
             print_ast(node[1], indent + 1)
         elif tag == "declare":
-            print(f"{prefix}Declare")
-            print(f"{prefix}-Sequencing")
+            if not sequenced:
+                print(f"{prefix}Declare")
+                print(f"{prefix}-Sequencing")
             ids = ", ".join(
                 [i[1] if isinstance(i, tuple) and i[0] == "id" else i for i in node[2]]
             )
             print(f"{prefix}--{ids} : {node[1]}")
         elif tag == "declare_func":
-            print(f"{prefix}Declare")
-            print(f"{prefix}-Sequencing")
+            if not sequenced:
+                print(f"{prefix}Declare")
+                print(f"{prefix}-Sequencing")
             ids = ", ".join(
                 [i[1] if isinstance(i, tuple) and i[0] == "id" else i for i in node[2]]
             )
@@ -283,26 +289,26 @@ def print_ast(node, indent=0):
             # node[1] es una lista de sentencias
             stmts = node[1] if isinstance(node[1], list) else [node[1]]
             if len(stmts) == 1:
-                print_ast(stmts[0], indent)
+                print_ast(stmts[0], indent, sequenced=sequenced)
             else:
-                print(f"{prefix}Sequencing")
-                print_ast(stmts[0], indent + 1)
-                print_ast(("Sequencing", stmts[1:]), indent + 1)
+
+                print_ast(stmts[0], indent + 1, sequenced=sequenced)
+                print_ast(("Sequencing", stmts[1:]), indent + 1, sequenced=True)
         elif tag == "binop":
             op_map = {
-                "TkPlus": "Plus",
-                "TkMinus": "Minus",
-                "TkMult": "Mult",
+                "+": "Plus",
+                "-": "Minus",
+                "*": "Mult",
                 "TkAnd": "And",
                 "TkOr": "Or",
-                "TkEqual": "Equal",
-                "TkNEqual": "NEqual",
-                "TkLess": "Less",
-                "TkGreater": "Greater",
-                "TkLeq": "Leq",
-                "TkGeq": "Geq",
-                "TkComma": "Comma",
-                "TkTwoPoints": "TwoPoints",
+                "=": "Equal",
+                "!=": "NEqual",
+                "<": "Less",
+                ">": "Greater",
+                "<=": "Leq",
+                ">=": "Geq",
+                ",": "Comma",
+                ":": "TwoPoints",
             }
             op = op_map.get(node[1], node[1])
             print(f"{prefix}{op}")
@@ -373,12 +379,18 @@ def main():
             del lexer.errors
 
         result = parser.parse(data, lexer=lexer)
+
+        # Print the raw AST
+        #print("Raw AST:")
+        #print(result)
+
+        # Print the formatted AST
+        print("\nFormatted AST:")
         print_ast(result)
 
     except FileNotFoundError:
         print(f"Error: El archivo '{filename}' no existe.")
         sys.exit(1)
-
 
 if __name__ == "__main__":
     main()
