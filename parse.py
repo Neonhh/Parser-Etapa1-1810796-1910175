@@ -235,6 +235,7 @@ parser = yacc.yacc(debug=False, write_tables=False)
 
 
 def print_ast(node, indent=0, sequenced=False):
+    #print("\n\n", node)
     prefix = "-" * indent
     if isinstance(node, tuple):
         tag = node[0]
@@ -288,19 +289,24 @@ def print_ast(node, indent=0, sequenced=False):
         elif tag == "Sequencing":
             # node[1] es una lista de sentencias
             stmts = node[1] if isinstance(node[1], list) else [node[1]]
+
+            if not sequenced:
+                print(f"{prefix}Sequencing")
+
             if len(stmts) == 1:
                 print_ast(stmts[0], indent, sequenced=sequenced)
             else:
-
                 print_ast(stmts[0], indent + 1, sequenced=sequenced)
                 print_ast(("Sequencing", stmts[1:]), indent + 1, sequenced=True)
+        
+        
         elif tag == "binop":
             op_map = {
                 "+": "Plus",
                 "-": "Minus",
                 "*": "Mult",
-                "TkAnd": "And",
-                "TkOr": "Or",
+                "and": "And",
+                "or": "Or",
                 "=": "Equal",
                 "!=": "NEqual",
                 "<": "Less",
@@ -311,9 +317,17 @@ def print_ast(node, indent=0, sequenced=False):
                 ":": "TwoPoints",
             }
             op = op_map.get(node[1], node[1])
+
             print(f"{prefix}{op}")
-            print_ast(node[2], indent + 1)
-            print_ast(node[3], indent + 1)
+
+            if op == "Comma":
+                # This one is inverted to match the requested output format
+                print_ast(node[3], indent + 1)
+                print_ast(node[2], indent + 1)
+            else:
+                print_ast(node[2], indent + 1)
+                print_ast(node[3], indent + 1)
+
         elif tag == "uminus":
             print(f"{prefix}Minus")
             print_ast(node[1], indent + 1)
@@ -333,7 +347,7 @@ def print_ast(node, indent=0, sequenced=False):
         elif tag == "num":
             print(f"{prefix}Literal: {node[1]}")
         elif tag == "string":
-            print(f'{prefix}String: "{node[1]}"')
+            print(f'{prefix}String: {node[1]}')
         elif tag == "true":
             print(f"{prefix}Literal: true")
         elif tag == "false":
@@ -346,12 +360,37 @@ def print_ast(node, indent=0, sequenced=False):
     elif isinstance(node, list):
         if not node:
             return
+ 
+        declarations = [n for n in node if isinstance(n, tuple) and (n[0] == "declare" or n[0] == "declare_func")]
+
+        other_nodes = [n for n in node if n not in declarations]
+
+        if declarations:
+            print_ast(declarations[0], indent, len(declarations) == 1)
+            for decl in declarations[1:]:
+                print_ast(decl, indent, sequenced=True)
+     
+        if other_nodes:
+            sequence_binary_ops(other_nodes, indent)
+        #if len(node) == 1:
+         #   print_ast(node[0], indent)
+        #else:
+        #    print_ast(("Sequencing", node), indent)
+    else:
+        print(f"{prefix}{node}")
+
+def sequence_binary_ops(node, indent):
+    """ Toma una lista de nodos del AST y los ordena de tal forma que la
+        secuenciacion tome maximo dos nodos a la vez. """
+    if isinstance(node, list):
         if len(node) == 1:
             print_ast(node[0], indent)
         else:
-            print_ast(("Sequencing", node), indent)
+            print(f"{'-' * indent}Sequencing")
+            sequence_binary_ops(node[:-1], indent + 1)
+            print_ast(node[-1], indent + 1)
     else:
-        print(f"{prefix}{node}")
+        return node
 
 
 def main():
@@ -381,8 +420,8 @@ def main():
         result = parser.parse(data, lexer=lexer)
 
         # Print the raw AST
-        #print("Raw AST:")
-        #print(result)
+        print("Raw AST:")
+        print(result)
 
         # Print the formatted AST
         print("\nFormatted AST:")
