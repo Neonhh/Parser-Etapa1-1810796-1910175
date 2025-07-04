@@ -244,17 +244,17 @@ def print_ast(node, indent=0, sequenced=False):
             print(f"{prefix}Block")
             print_ast(node[1], indent + 1)
         elif tag == "declare":
-            if not sequenced:
-                print(f"{prefix}Declare")
-                print(f"{prefix}-Sequencing")
+            #if not sequenced:
+            #    print(f"{prefix}Declare")
+            #    print(f"{prefix}-Sequencing")
             ids = ", ".join(
                 [i[1] if isinstance(i, tuple) and i[0] == "id" else i for i in node[2]]
             )
             print(f"{prefix}--{ids} : {node[1]}")
         elif tag == "declare_func":
-            if not sequenced:
-                print(f"{prefix}Declare")
-                print(f"{prefix}-Sequencing")
+            #if not sequenced:
+            #    print(f"{prefix}Declare")
+            #    print(f"{prefix}-Sequencing")
             ids = ", ".join(
                 [i[1] if isinstance(i, tuple) and i[0] == "id" else i for i in node[2]]
             )
@@ -593,7 +593,7 @@ def print_decorated_ast(node, indent=0, sequenced=False):
             # Imprime la tabla de símbolos sin indentación extra
             for name, typ in node[1].symbols.items():
                 print(f"{prefix}--variable: {name} | type: {typ}")
-            print(f"{prefix}-Sequencing")
+            #print(f"{prefix}-Sequencing")
             print_decorated_ast(node[2], indent + 1)
         elif tag == "Declare":
             pass
@@ -649,14 +649,37 @@ def print_decorated_ast(node, indent=0, sequenced=False):
             for child in node[1:]:
                 print_decorated_ast(child, indent + 1)
     elif isinstance(node, list):
+        #print("Nodo es una lista")
+        #print(node[0][0])
         if not node:
             return
         if len(node) == 1:
             print_decorated_ast(node[0], indent)
         else:
-            print(f"{prefix}Sequencing")
-            print_decorated_ast(node[0], indent + 1)
-            print_decorated_ast(node[1:], indent + 1)
+            
+            # Separate declarations from other nodes
+            declarations = [n for n in node if n[0] in ("Declare", "DeclareFunc")]
+            other_nodes = [n for n in node if n[0] not in ("Declare", "DeclareFunc")]
+
+            # Process declarations first
+            for decl in declarations:
+                print_decorated_ast(decl, indent)
+
+            def process_nested_sequencing(nodes, current_indent):
+                """Procesa una lista de nodos y los organiza en secuencias anidadas."""
+                if not nodes:
+                    return
+                if len(nodes) == 1:
+                    # Si solo hay un nodo, procesarlo directamente
+                    print_decorated_ast(nodes[0], current_indent + 1)
+                else:
+                    print(f"{'-' * current_indent}Sequencing")
+                    # Procesar el resto de los nodos recursivamente
+                    process_nested_sequencing(nodes[:-1], current_indent + 1)
+                    print_decorated_ast(nodes[-1], current_indent + 1)
+
+            if other_nodes:
+                process_nested_sequencing(other_nodes, indent)
     else:
         print(f"{prefix}{node}")
 
@@ -765,17 +788,30 @@ def main():
         # Limpia errores previos del lexer si existen
         if hasattr(lexer, "errors"):
             del lexer.errors
+        
 
         result = parser.parse(data, lexer=lexer)
+        # Imprime el AST sin formato
+        print("AST sin formato:")
+        print(result)
+        
+        
+        # Imprime el AST sin decorar
+        print("AST sin decorar:")
+        print_ast(result)
 
         # Análisis de contexto y verificación de tipos
         try:
             decorated = analyze_context(result)
+            # Imprime la tabla de símbolos
+            print("\nTabla de símbolos:")
+            print(decorated)
         except Exception as e:
             print(e)
             sys.exit(1)
 
         # Imprime el AST decorado y la tabla de símbolos
+        print("\nAST decorado:")
         print_decorated_ast(decorated)
 
     except FileNotFoundError:
