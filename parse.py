@@ -1,5 +1,5 @@
 # --------------------------------------------------------------
-# Etapa 2: Análisis Sintáctico con Árbol Sintáctico
+# Etapa 3: Análisis de Contexto de GCL
 # Proyecto: Traductor de Lenguaje Imperativo al Lenguaje del Lamba Cálculo
 # Estudiantes: Néstor Herrera (18-10786) y Luis Isea (19-10175)
 # --------------------------------------------------------------
@@ -9,7 +9,7 @@ from lexer import lexer, tokens
 import sys
 
 
-# Precedencia de operadores (ajusta según tu gramática)
+# Precedencia de operadores
 precedence = (
     ("left", "TkOr"),
     ("left", "TkAnd"),
@@ -30,7 +30,7 @@ def p_S(p):
 
 def p_B(p):
     "B : TkOBlock opt_stmt_list TkCBlock"
-    #print("Parsed block:", p[2])
+    # print("Parsed block:", p[2])
     p[0] = ("block", p[2])
 
 
@@ -47,10 +47,10 @@ def p_stmt_list(p):
     """stmt_list : statement
     | statement TkSemicolon stmt_list"""
     if len(p) == 2:
-        #print("Parsed single statement:", p[1])
+        # print("Parsed single statement:", p[1])
         p[0] = [p[1]]
     else:
-        #print("Parsed statement list with semicolon:", p[1], p[3])
+        # print("Parsed statement list with semicolon:", p[1], p[3])
         p[0] = [p[1]] + p[3]
 
 
@@ -61,7 +61,7 @@ def p_statement(p):
     | skip_stmt
     | if_stmt
     | while_stmt"""
-    #print("Parsed statement:", p[1])
+    # print("Parsed statement:", p[1])
     p[0] = p[1]
 
 
@@ -235,7 +235,7 @@ parser = yacc.yacc(debug=False, write_tables=False)
 
 
 def print_ast(node, indent=0, sequenced=False):
-    #print("\n\n", node)
+    # print("\n\n", node)
     prefix = "-" * indent
     if isinstance(node, tuple):
         tag = node[0]
@@ -298,8 +298,7 @@ def print_ast(node, indent=0, sequenced=False):
             else:
                 print_ast(stmts[0], indent + 1, sequenced=sequenced)
                 print_ast(("Sequencing", stmts[1:]), indent + 1, sequenced=True)
-        
-        
+
         elif tag == "binop":
             op_map = {
                 "+": "Plus",
@@ -321,7 +320,6 @@ def print_ast(node, indent=0, sequenced=False):
             print(f"{prefix}{op}")
 
             if op == "Comma":
-                # This one is inverted to match the requested output format
                 print_ast(node[3], indent + 1)
                 print_ast(node[2], indent + 1)
             else:
@@ -347,21 +345,25 @@ def print_ast(node, indent=0, sequenced=False):
         elif tag == "num":
             print(f"{prefix}Literal: {node[1]}")
         elif tag == "string":
-            print(f'{prefix}String: {node[1]}')
+            print(f"{prefix}String: {node[1]}")
         elif tag == "true":
             print(f"{prefix}Literal: true")
         elif tag == "false":
             print(f"{prefix}Literal: false")
         else:
-            # fallback
+            # Cualquier otro nodo
             print(f"{prefix}{tag}")
             for child in node[1:]:
                 print_ast(child, indent + 1)
     elif isinstance(node, list):
         if not node:
             return
- 
-        declarations = [n for n in node if isinstance(n, tuple) and (n[0] == "declare" or n[0] == "declare_func")]
+
+        declarations = [
+            n
+            for n in node
+            if isinstance(n, tuple) and (n[0] == "declare" or n[0] == "declare_func")
+        ]
 
         other_nodes = [n for n in node if n not in declarations]
 
@@ -369,19 +371,20 @@ def print_ast(node, indent=0, sequenced=False):
             print_ast(declarations[0], indent, len(declarations) == 1)
             for decl in declarations[1:]:
                 print_ast(decl, indent, sequenced=True)
-     
+
         if other_nodes:
             sequence_binary_ops(other_nodes, indent)
-        #if len(node) == 1:
-         #   print_ast(node[0], indent)
-        #else:
+        # if len(node) == 1:
+        #   print_ast(node[0], indent)
+        # else:
         #    print_ast(("Sequencing", node), indent)
     else:
         print(f"{prefix}{node}")
 
+
 def sequence_binary_ops(node, indent):
-    """ Toma una lista de nodos del AST y los ordena de tal forma que la
-        secuenciacion tome maximo dos nodos a la vez. """
+    """Toma una lista de nodos del AST y los ordena de tal forma que la
+    secuenciacion tome maximo dos nodos a la vez."""
     if isinstance(node, list):
         if len(node) == 1:
             print_ast(node[0], indent)
@@ -391,6 +394,352 @@ def sequence_binary_ops(node, indent):
             print_ast(node[-1], indent + 1)
     else:
         return node
+
+
+# Tabla de símbolos para el análisis de contexto y tipos
+class SymbolTable:
+    def __init__(self, parent=None):
+        self.symbols = {}
+        self.parent = parent
+
+    def declare(self, name, typ):
+        if name in self.symbols:
+            raise Exception(f"Redeclaration of variable '{name}'")
+        self.symbols[name] = typ
+
+    def lookup(self, name):
+        if name in self.symbols:
+            return self.symbols[name]
+        elif self.parent:
+            return self.parent.lookup(name)
+        else:
+            return None
+
+    def in_current_scope(self, name):
+        return name in self.symbols
+
+    def __str__(self):
+        result = ""
+        for name, typ in self.symbols.items():
+            result += f"--variable: {name} | type: {typ}\n"
+        return result.rstrip()
+
+
+# Función para verificar compatibilidad de tipos
+def type_compatible(declared, exprtype):
+    if declared == exprtype:
+        return True
+    # Para funciones, permitir asignar tuplas de argumentos a funciones
+    if declared.startswith("function[..") and exprtype.startswith(
+        "function with length="
+    ):
+        return True
+    return False
+
+
+# Decoración y verificación de tipos en expresiones
+def analyze_expr(node, symtable):
+    tag = node[0]
+    if tag == "id":
+        name = node[1]
+        typ = symtable.lookup(name)
+        if typ is None:
+            raise Exception(f"Use of undeclared variable '{name}'")
+        return ("id", name, typ), typ
+    elif tag == "num":
+        return ("num", node[1], "int"), "int"
+    elif tag == "true":
+        return ("true", "bool"), "bool"
+    elif tag == "false":
+        return ("false", "bool"), "bool"
+    elif tag == "string":
+        return ("string", node[1], "string"), "string"
+    elif tag == "binop":
+        op = node[1]
+        left, ltype = analyze_expr(node[2], symtable)
+        right, rtype = analyze_expr(node[3], symtable)
+        if op in ["+", "-", "*"]:
+            if ltype != "int" or rtype != "int":
+                raise Exception("Type error: arithmetic operations require int")
+            return ("binop", op, left, right), "int"
+        elif op in ["and", "or"]:
+            if ltype != "bool" or rtype != "bool":
+                raise Exception("Type error: logical operations require bool")
+            return ("binop", op, left, right), "bool"
+        elif op in ["==", "<>", "<", ">", "<=", ">="]:
+            if ltype != rtype:
+                raise Exception("Type error: comparison requires same type")
+            return ("binop", op, left, right), "bool"
+        elif op == ",":
+            # Para funciones, devolver tipo especial
+            return ("binop", op, left, right), "function with length=2"
+        elif op == ":":
+            return ("binop", op, left, right), "TwoPoints"
+        else:
+            return ("binop", op, left, right), "unknown"
+    elif tag == "uminus":
+        expr, typ = analyze_expr(node[1], symtable)
+        if typ != "int":
+            raise Exception("Type error: unary minus requires int")
+        return ("uminus", expr, "int"), "int"
+    elif tag == "not":
+        expr, typ = analyze_expr(node[1], symtable)
+        if typ != "bool":
+            raise Exception("Type error: not requires bool")
+        return ("not", expr, "bool"), "bool"
+    elif tag == "app":
+        left, ltype = analyze_expr(node[1], symtable)
+        right, rtype = analyze_expr(node[2], symtable)
+        # Para este lenguaje, asumimos que app solo se usa con funciones
+        if not ltype.startswith("function[.."):
+            raise Exception("Type error: app requires function on left")
+        return ("app", left, right, "int"), "int"  # Suponemos que retorna int
+    elif tag == "call":
+        left, ltype = analyze_expr(node[1], symtable)
+        right, rtype = analyze_expr(node[2], symtable)
+        return ("call", left, right, "int"), "int"
+    else:
+        return node, "unknown"
+
+
+# Decoración y verificación de contexto en el AST
+def analyze_context(node, symtable=None):
+    if symtable is None:
+        symtable = SymbolTable()
+
+    tag = node[0] if isinstance(node, tuple) else None
+
+    if tag == "block":
+        new_table = SymbolTable(parent=symtable)
+        stmts = analyze_context(node[1], new_table)
+        return ("Block", new_table, stmts)
+
+    elif isinstance(node, list):
+        return [analyze_context(n, symtable) for n in node]
+
+    elif tag == "declare":
+        typ = node[1]
+        for var in node[2]:
+            name = var[1] if isinstance(var, tuple) else var
+            if symtable.in_current_scope(name):
+                raise Exception(f"Redeclaration of variable '{name}'")
+            symtable.declare(name, typ)
+        return ("Declare", typ, node[2])
+
+    elif tag == "declare_func":
+        typ = f"function[..{node[1]}]"
+        for var in node[2]:
+            name = var[1] if isinstance(var, tuple) else var
+            if symtable.in_current_scope(name):
+                raise Exception(f"Redeclaration of variable '{name}'")
+            symtable.declare(name, typ)
+        return ("DeclareFunc", typ, node[2])
+
+    elif tag == "assign":
+        varname = node[1]
+        vartype = symtable.lookup(varname)
+        if vartype is None:
+            raise Exception(f"Use of undeclared variable '{varname}'")
+        expr, exprtype = analyze_expr(node[2], symtable)
+        if not type_compatible(vartype, exprtype):
+            raise Exception(f"Type error: cannot assign {exprtype} to {vartype}")
+        return ("Asig", (varname, vartype), (expr, exprtype))
+
+    elif tag == "print":
+        expr, exprtype = analyze_expr(node[1], symtable)
+        return ("Print", (expr, exprtype))
+
+    elif tag == "skip":
+        return ("Skip",)
+
+    elif tag == "while":
+        cond, condtype = analyze_expr(node[1], symtable)
+        if condtype != "bool":
+            raise Exception("Type error: while condition must be bool")
+        body = analyze_context(node[2], symtable)
+        return ("While", (cond, condtype), body)
+
+    elif tag == "if":
+        guards = [analyze_guard(g, symtable) for g in node[1]]
+        return ("If", guards)
+
+    elif tag == "Guard":
+        return analyze_guard(node[1], symtable)
+
+    else:
+        return node
+
+
+# Análisis de guardas en el contexto
+def analyze_guard(guard, symtable):
+    if guard[0] == "guard":
+        cond, condtype = analyze_expr(guard[1], symtable)
+        if condtype != "bool":
+            raise Exception("Type error: guard condition must be bool")
+        body = analyze_context(guard[2], symtable)
+        return ("Guard", (cond, condtype), body)
+    else:
+        return guard
+
+
+# Impresión del AST decorado y tabla de símbolos
+def print_decorated_ast(node, indent=0, sequenced=False):
+    prefix = "-" * indent
+    if isinstance(node, tuple):
+        tag = node[0]
+        if tag == "Block":
+            print(f"{prefix}Block")
+            print(f"{prefix}-Symbols Table")
+            # Imprime la tabla de símbolos sin indentación extra
+            for name, typ in node[1].symbols.items():
+                print(f"{prefix}--variable: {name} | type: {typ}")
+            print(f"{prefix}-Sequencing")
+            print_decorated_ast(node[2], indent + 1)
+        elif tag == "Declare":
+            pass
+        elif tag == "DeclareFunc":
+            pass
+        elif tag == "Asig":
+            print(f"{prefix}Asig")
+            print(f"{prefix}-Ident: {node[1][0]} | type: {node[1][1]}")
+            print_expr_decorated(node[2][0], indent + 1)
+        elif tag == "Print":
+            print(f"{prefix}Print")
+            print_expr_decorated(node[1][0], indent + 1)
+        elif tag == "Skip":
+            print(f"{prefix}Skip")
+        elif tag == "While":
+            print(f"{prefix}While")
+            print(f"{prefix}-Then")
+            print_expr_decorated(node[1][0], indent + 2)
+            print_decorated_ast(node[2], indent + 2)
+        elif tag == "If":
+            print(f"{prefix}If")
+            for guard in node[1]:
+                print_decorated_ast(guard, indent + 1)
+        elif tag == "Guard":
+            print(f"{prefix}Guard")
+            print(f"{prefix}-Then")
+            print_expr_decorated(node[1][0], indent + 1)
+            print_decorated_ast(node[2], indent + 1)
+        elif tag == "binop":
+            print_expr_decorated(node, indent)
+        elif tag == "uminus" or tag == "not" or tag == "app" or tag == "call":
+            print_expr_decorated(node, indent)
+        elif (
+            tag == "id"
+            or tag == "num"
+            or tag == "string"
+            or tag == "true"
+            or tag == "false"
+        ):
+            print_expr_decorated(node, indent)
+        elif tag == "Sequencing":
+            print(f"{prefix}Sequencing")
+            stmts = node[1] if isinstance(node[1], list) else [node[1]]
+            if len(stmts) == 1:
+                print_decorated_ast(stmts[0], indent + 1, sequenced=sequenced)
+            else:
+                print_decorated_ast(stmts[0], indent + 1, sequenced=sequenced)
+                print_decorated_ast(
+                    ("Sequencing", stmts[1:]), indent + 1, sequenced=True
+                )
+        else:
+            print(f"{prefix}{tag}")
+            for child in node[1:]:
+                print_decorated_ast(child, indent + 1)
+    elif isinstance(node, list):
+        if not node:
+            return
+        if len(node) == 1:
+            print_decorated_ast(node[0], indent)
+        else:
+            print(f"{prefix}Sequencing")
+            print_decorated_ast(node[0], indent + 1)
+            print_decorated_ast(node[1:], indent + 1)
+    else:
+        print(f"{prefix}{node}")
+
+
+def print_expr_decorated(node, indent=0):
+    """
+    Imprime nodos de expresión decorados (con tipo) y crudos (sin tipo),
+    usando el mismo formato que print_decorated_ast para expresiones.
+    """
+    prefix = "-" * indent
+    if isinstance(node, tuple):
+        tag = node[0]
+        # Si el nodo ya viene decorado con tipo
+        if tag == "id":
+            if len(node) == 3:
+                print(f"{prefix}Ident: {node[1]} | type: {node[2]}")
+            else:
+                print(f"{prefix}Ident: {node[1]}")
+        elif tag == "num":
+            print(f"{prefix}Literal: {node[1]} | type: int")
+        elif tag == "string":
+            print(f"{prefix}String: {node[1]} | type: string")
+        elif tag == "true":
+            print(f"{prefix}Literal: true | type: bool")
+        elif tag == "false":
+            print(f"{prefix}Literal: false | type: bool")
+        elif tag == "binop":
+            op_map = {
+                "+": "Plus",
+                "-": "Minus",
+                "*": "Mult",
+                "and": "And",
+                "or": "Or",
+                "==": "Equal",
+                "<>": "NotEqual",
+                "<": "Less",
+                ">": "Greater",
+                "<=": "Leq",
+                ">=": "Geq",
+                ",": "Comma",
+                ":": "TwoPoints",
+            }
+            op = op_map.get(node[1], node[1])
+            if op == "Comma":
+                print(f"{prefix}{op} | type: function with length=2")
+                print_expr_decorated(node[2], indent + 1)
+                print_expr_decorated(node[3], indent + 1)
+            else:
+                if op in ["Plus", "Minus", "Mult"]:
+                    typ = "int"
+                elif op in ["And", "Or"]:
+                    typ = "bool"
+                elif op in ["Equal", "NotEqual", "Less", "Greater", "Leq", "Geq"]:
+                    typ = "bool"
+                else:
+                    typ = "unknown"
+                print(f"{prefix}{op} | type: {typ}")
+                print_expr_decorated(node[2], indent + 1)
+                print_expr_decorated(node[3], indent + 1)
+        elif tag == "uminus":
+            print(f"{prefix}Minus | type: int")
+            print_expr_decorated(node[1], indent + 1)
+        elif tag == "not":
+            print(f"{prefix}Not | type: bool")
+            print_expr_decorated(node[1], indent + 1)
+        elif tag == "app":
+            print(f"{prefix}App | type: int")
+            print_expr_decorated(node[1], indent + 1)
+            print_expr_decorated(node[2], indent + 1)
+        elif tag == "call":
+            print(f"{prefix}WriteFunction | type: int")
+            print_expr_decorated(node[1], indent + 1)
+            print_expr_decorated(node[2], indent + 1)
+        else:
+            # Cualquier otro nodo
+            print(f"{prefix}{tag}")
+            for child in node[1:]:
+                print_expr_decorated(child, indent + 1)
+    elif isinstance(node, list):
+        for n in node:
+            print_expr_decorated(n, indent)
+    else:
+        print(f"{prefix}{node}")
 
 
 def main():
@@ -419,17 +768,20 @@ def main():
 
         result = parser.parse(data, lexer=lexer)
 
-        # Print the raw AST
-        print("Raw AST:")
-        print(result)
+        # Análisis de contexto y verificación de tipos
+        try:
+            decorated = analyze_context(result)
+        except Exception as e:
+            print(e)
+            sys.exit(1)
 
-        # Print the formatted AST
-        print("\nFormatted AST:")
-        print_ast(result)
+        # Imprime el AST decorado y la tabla de símbolos
+        print_decorated_ast(decorated)
 
     except FileNotFoundError:
         print(f"Error: El archivo '{filename}' no existe.")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()
