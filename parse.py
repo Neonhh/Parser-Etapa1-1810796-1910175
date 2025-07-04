@@ -615,10 +615,12 @@ def print_decorated_ast(node, indent=0, sequenced=False):
             print_decorated_ast(node[2], indent + 2)
         elif tag == "If":
             print(f"{prefix}If")
-            for guard in node[1]:
-                print_decorated_ast(guard, indent + 1)
+            for i, guard in enumerate(node[1]):
+                print_decorated_ast(guard, indent + 1,sequenced=(i > 0))
         elif tag == "Guard":
-            print(f"{prefix}Guard")
+            # Imprime 'Guard' solo si no es la primera guarda
+            if not sequenced:
+                print(f"{prefix}Guard")
             print(f"{prefix}-Then")
             print_expr_decorated(node[1][0], indent + 1)
             print_decorated_ast(node[2], indent + 1)
