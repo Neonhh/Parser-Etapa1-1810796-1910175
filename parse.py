@@ -164,7 +164,9 @@ def p_E_binop(p):
     | E TkGeq E
     | E TkComma E
     | E TkTwoPoints E"""
-    p[0] = ("binop", p[2], p[1], p[3])
+    line = p.lineno(2)
+    col = find_column(p.lexer.lexdata, p.lexpos(2))
+    p[0] = ("binop", p[2], p[1], p[3], line, col)
 
 
 def p_E_uminus(p):
@@ -505,21 +507,22 @@ def analyze_expr(node, symtable):
             elif ltype == "int" and rtype == "int":
                 return ("binop", op, left, right), "int"
             else:
-                raise Exception(
-                    "Type error: '+' requires both operands to be int or at least one to be string"
-                )
+                # Extrae línea y columna del nodo binop (posición del '+')
+                line = node[4] if len(node) > 4 else None
+                col = node[5] if len(node) > 5 else None
+                raise Exception(f"Type error at line {line} and column {col}")
         elif op in ["-", "*"]:
             if ltype != "int" or rtype != "int":
                 raise Exception("Type error: arithmetic operations require int")
-            return ("binop", op, left, right), "int"
+            return ("binop", op, left, right, line, col), "int"
         elif op in ["and", "or"]:
             if ltype != "bool" or rtype != "bool":
                 raise Exception("Type error: logical operations require bool")
-            return ("binop", op, left, right), "bool"
+            return ("binop", op, left, right, line, col), "bool"
         elif op in ["==", "<>", "<", ">", "<=", ">="]:
             if ltype != rtype:
                 raise Exception("Type error: comparison requires same type")
-            return ("binop", op, left, right), "bool"
+            return ("binop", op, left, right, line, col), "bool"
         elif op == ",":
             # Para funciones, devolver tipo especial
             # Soportar tuplas de más de dos elementos
@@ -541,11 +544,18 @@ def analyze_expr(node, symtable):
                     total_len = 2
             else:
                 total_len = 2
-            return ("binop", op, left, right), f"function with length={total_len}"
+            return (
+                "binop",
+                op,
+                left,
+                right,
+                line,
+                col,
+            ), f"function with length={total_len}"
         elif op == ":":
-            return ("binop", op, left, right), "TwoPoints"
+            return ("binop", op, left, right, line, col), "TwoPoints"
         else:
-            return ("binop", op, left, right), "unknown"
+            return ("binop", op, left, right, line, col), "unknown"
     elif tag == "uminus":
         expr, typ = analyze_expr(node[1], symtable)
         if typ != "int":
