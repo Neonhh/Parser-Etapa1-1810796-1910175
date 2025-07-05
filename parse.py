@@ -633,8 +633,8 @@ def print_decorated_ast(node, indent=0, sequenced=False):
             if not sequenced:
                 print(f"{prefix}Guard")
             print(f"{prefix}-Then")
-            print_expr_decorated(node[1][0], indent + 1)
-            print_decorated_ast(node[2], indent + 1)
+            print_expr_decorated(node[1][0], indent + 2)
+            print_decorated_ast(node[2], indent + 2)
         elif tag == "binop":
             print_expr_decorated(node, indent)
         elif tag == "uminus" or tag == "not" or tag == "app" or tag == "call":
