@@ -191,7 +191,10 @@ def p_atom_simple(p):
 
 def p_simple_atom_id(p):
     "simple_atom : TkId"
-    p[0] = ("id", p[1])
+    # Guardar línea y columna del identificador
+    line = p.lineno(1)
+    col = find_column(p.lexer.lexdata, p.lexpos(1))
+    p[0] = ("id", p[1], line, col)
 
 
 def p_simple_atom_num(p):
@@ -244,7 +247,7 @@ def print_ast(node, indent=0, sequenced=False):
             print(f"{prefix}Block")
             print_ast(node[1], indent + 1)
         elif tag == "declare":
-            #if not sequenced:
+            # if not sequenced:
             #    print(f"{prefix}Declare")
             #    print(f"{prefix}-Sequencing")
             ids = ", ".join(
@@ -252,7 +255,7 @@ def print_ast(node, indent=0, sequenced=False):
             )
             print(f"{prefix}--{ids} : {node[1]}")
         elif tag == "declare_func":
-            #if not sequenced:
+            # if not sequenced:
             #    print(f"{prefix}Declare")
             #    print(f"{prefix}-Sequencing")
             ids = ", ".join(
@@ -442,9 +445,17 @@ def analyze_expr(node, symtable):
     tag = node[0]
     if tag == "id":
         name = node[1]
+        # Extraer línea y columna si están presentes
+        line = node[2] if len(node) > 2 else None
+        col = node[3] if len(node) > 3 else None
         typ = symtable.lookup(name)
         if typ is None:
-            raise Exception(f"Use of undeclared variable '{name}'")
+            if line is not None and col is not None:
+                raise Exception(
+                    f"Variable not declared at line {line} and column {col}"
+                )
+            else:
+                raise Exception(f"Variable not declared: {name}")
         return ("id", name, typ), typ
     elif tag == "num":
         return ("num", node[1], "int"), "int"
@@ -593,7 +604,7 @@ def print_decorated_ast(node, indent=0, sequenced=False):
             # Imprime la tabla de símbolos sin indentación extra
             for name, typ in node[1].symbols.items():
                 print(f"{prefix}--variable: {name} | type: {typ}")
-            #print(f"{prefix}-Sequencing")
+            # print(f"{prefix}-Sequencing")
             print_decorated_ast(node[2], indent + 1)
         elif tag == "Declare":
             pass
@@ -616,7 +627,7 @@ def print_decorated_ast(node, indent=0, sequenced=False):
         elif tag == "If":
             print(f"{prefix}If")
             for i, guard in enumerate(node[1]):
-                print_decorated_ast(guard, indent + 1,sequenced=(i > 0))
+                print_decorated_ast(guard, indent + 1, sequenced=(i > 0))
         elif tag == "Guard":
             # Imprime 'Guard' solo si no es la primera guarda
             if not sequenced:
@@ -651,14 +662,13 @@ def print_decorated_ast(node, indent=0, sequenced=False):
             for child in node[1:]:
                 print_decorated_ast(child, indent + 1)
     elif isinstance(node, list):
-        #print("Nodo es una lista")
-        #print(node[0][0])
+        # print("Nodo es una lista")
+        # print(node[0][0])
         if not node:
             return
         if len(node) == 1:
             print_decorated_ast(node[0], indent)
         else:
-            
             # Separate declarations from other nodes
             declarations = [n for n in node if n[0] in ("Declare", "DeclareFunc")]
             other_nodes = [n for n in node if n[0] not in ("Declare", "DeclareFunc")]
@@ -767,6 +777,13 @@ def print_expr_decorated(node, indent=0):
         print(f"{prefix}{node}")
 
 
+def find_column(input, lexpos):
+    last_newline = input.rfind("\n", 0, lexpos)
+    if last_newline < 0:
+        last_newline = -1
+    return lexpos - last_newline
+
+
 def main():
     # Procesamiento del input por consola
     if len(sys.argv) != 2:
@@ -790,14 +807,12 @@ def main():
         # Limpia errores previos del lexer si existen
         if hasattr(lexer, "errors"):
             del lexer.errors
-        
 
         result = parser.parse(data, lexer=lexer)
         # Imprime el AST sin formato
         print("AST sin formato:")
         print(result)
-        
-        
+
         # Imprime el AST sin decorar
         print("AST sin decorar:")
         print_ast(result)
