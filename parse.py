@@ -19,7 +19,7 @@ precedence = (
     ("left", "TkMult"),
     ("right", "TkNot"),
     ("right", "UMINUS"),
-    ("left", "TkApp")
+    ("left", "TkApp"),
 )
 
 
@@ -537,9 +537,6 @@ def analyze_expr(node, symtable):
     elif tag == "app":
         left, ltype = analyze_expr(node[1], symtable)
         right, rtype = analyze_expr(node[2], symtable)
-        #Imprimimos las expresiones analizadas
-        print(f"Left: {left}, Type: {ltype}")
-        print(f"Right: {right}, Type: {rtype}")
         # Para este lenguaje, asumimos que app solo se usa con funciones
         if not ltype.startswith("function[.."):
             raise Exception("Type error: app requires function on left")
@@ -551,8 +548,13 @@ def analyze_expr(node, symtable):
 
         if not ltype.startswith("function[.."):
             raise Exception("Type error: call requires function on left")
-        
-        return ("call", left, right, ltype), ltype  #Suponemos que retorna el tipo de la función
+
+        return (
+            "call",
+            left,
+            right,
+            ltype,
+        ), ltype  # Suponemos que retorna el tipo de la función
     else:
         return node, "unknown"
 
@@ -596,10 +598,14 @@ def analyze_context(node, symtable=None):
         line = node[3] if len(node) > 3 else None
         col = node[4] if len(node) > 4 else None
         if vartype is None:
-            raise Exception(f"Use of undeclared variable '{varname}' at line {line} and column {col}")
+            raise Exception(
+                f"Use of undeclared variable '{varname}' at line {line} and column {col}"
+            )
         expr, exprtype = analyze_expr(node[2], symtable)
         if not type_compatible(vartype, exprtype):
-            raise Exception(f"Type error: cannot assign {exprtype} to {vartype} at line {line} and column {col}")
+            raise Exception(
+                f"Type error. Variable {varname} has different type than expression at line {line} and column {col}"
+            )
         return ("Asig", (varname, vartype), (expr, exprtype))
 
     elif tag == "print":
