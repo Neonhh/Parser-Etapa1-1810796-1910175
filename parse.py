@@ -171,7 +171,9 @@ def p_E_binop(p):
 
 def p_E_uminus(p):
     "E : TkMinus E %prec UMINUS"
-    p[0] = ("uminus", p[2])
+    line = p.lineno(1)
+    col = find_column(p.lexer.lexdata, p.lexpos(1))
+    p[0] = ("uminus", p[2], line, col)
 
 
 def p_E_not(p):
@@ -593,8 +595,11 @@ def analyze_expr(node, symtable):
             return ("binop", op, left, right, line, col), "unknown"
     elif tag == "uminus":
         expr, typ = analyze_expr(node[1], symtable)
+        # Extraer línea y columna si existen
+        line = node[2] if len(node) > 2 else None
+        col = node[3] if len(node) > 3 else None
         if typ != "int":
-            raise Exception("Type error: unary minus requires int")
+            raise Exception(f"Type error in line {line} and column {col}")
         return ("uminus", expr, "int"), "int"
     elif tag == "not":
         expr, typ = analyze_expr(node[1], symtable)
