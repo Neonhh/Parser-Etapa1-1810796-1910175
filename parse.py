@@ -174,7 +174,9 @@ def p_E_uminus(p):
 
 def p_E_not(p):
     "E : TkNot E"
-    p[0] = ("not", p[2])
+    line = p.lineno(1)
+    col = find_column(p.lexer.lexdata, p.lexpos(1))
+    p[0] = ("not", p[2], line, col)
 
 
 def p_E_atom(p):
@@ -531,8 +533,10 @@ def analyze_expr(node, symtable):
         return ("uminus", expr, "int"), "int"
     elif tag == "not":
         expr, typ = analyze_expr(node[1], symtable)
+        line = node[2] if len(node) > 2 else None
+        col = node[3] if len(node) > 3 else None
         if typ != "bool":
-            raise Exception("Type error: not requires bool")
+            raise Exception(f"Type error in line {line} and column {col}")
         return ("not", expr, "bool"), "bool"
     elif tag == "app":
         left, ltype = analyze_expr(node[1], symtable)
