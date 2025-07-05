@@ -325,29 +325,49 @@ def print_ast(node, indent=0, sequenced=False):
             }
             op = op_map.get(node[1], node[1])
 
-            print(f"{prefix}{op}")
+            def get_tuple_length(n):
+                if isinstance(n, tuple) and n[0] == "binop" and n[1] == ",":
+                    return get_tuple_length(n[2]) + get_tuple_length(n[3])
+                else:
+                    return 1
 
             if op == "Comma":
-                print_ast(node[3], indent + 1)
-                print_ast(node[2], indent + 1)
+                length = get_tuple_length(node)
+                print(f"{prefix}Comma | type: function with length={length}")
+                print_expr_decorated(node[2], indent + 1)
+                print_expr_decorated(node[3], indent + 1)
+            elif op == "TwoPoints":
+                print(f"{prefix}TwoPoints")
+                print_expr_decorated(node[2], indent + 1)
+                print_expr_decorated(node[3], indent + 1)
             else:
-                print_ast(node[2], indent + 1)
-                print_ast(node[3], indent + 1)
-
+                if op in ["Plus", "Minus", "Mult"]:
+                    typ = "int"
+                elif op in ["And", "Or"]:
+                    typ = "bool"
+                elif op in ["Equal", "NotEqual", "Less", "Greater", "Leq", "Geq"]:
+                    typ = "bool"
+                else:
+                    typ = "unknown"
+                print(f"{prefix}{op} | type: {typ}")
+                print_expr_decorated(node[2], indent + 1)
+                print_expr_decorated(node[3], indent + 1)
         elif tag == "uminus":
-            print(f"{prefix}Minus")
-            print_ast(node[1], indent + 1)
+            print(f"{prefix}Minus | type: int")
+            print_expr_decorated(node[1], indent + 1)
         elif tag == "not":
-            print(f"{prefix}Not")
-            print_ast(node[1], indent + 1)
+            print(f"{prefix}Not | type: bool")
+            print_expr_decorated(node[1], indent + 1)
         elif tag == "app":
-            print(f"{prefix}App")
-            print_ast(node[1], indent + 1)
-            print_ast(node[2], indent + 1)
+            print(f"{prefix}ReadFunction | type: int")
+            print_expr_decorated(node[1], indent + 1)
+            print_expr_decorated(node[2], indent + 1)
         elif tag == "call":
-            print(f"{prefix}WriteFunction")
-            print_ast(node[1], indent + 1)
-            print_ast(node[2], indent + 1)
+            # Imprime el tipo real de la función
+            typ = node[3] if len(node) > 3 else "int"
+            print(f"{prefix}WriteFunction | type: {typ}")
+            print_expr_decorated(node[1], indent + 1)
+            print_expr_decorated(node[2], indent + 1)
         elif tag == "id":
             print(f"{prefix}Ident: {node[1]}")
         elif tag == "num":
@@ -795,8 +815,20 @@ def print_expr_decorated(node, indent=0):
                 ":": "TwoPoints",
             }
             op = op_map.get(node[1], node[1])
+
+            def get_tuple_length(n):
+                if isinstance(n, tuple) and n[0] == "binop" and n[1] == ",":
+                    return get_tuple_length(n[2]) + get_tuple_length(n[3])
+                else:
+                    return 1
+
             if op == "Comma":
-                print(f"{prefix}{op} | type: function with length=2")
+                length = get_tuple_length(node)
+                print(f"{prefix}Comma | type: function with length={length}")
+                print_expr_decorated(node[2], indent + 1)
+                print_expr_decorated(node[3], indent + 1)
+            elif op == "TwoPoints":
+                print(f"{prefix}TwoPoints")
                 print_expr_decorated(node[2], indent + 1)
                 print_expr_decorated(node[3], indent + 1)
             else:
@@ -822,7 +854,9 @@ def print_expr_decorated(node, indent=0):
             print_expr_decorated(node[1], indent + 1)
             print_expr_decorated(node[2], indent + 1)
         elif tag == "call":
-            print(f"{prefix}WriteFunction | type: int")
+            # Imprime el tipo real de la función
+            typ = node[3] if len(node) > 3 else "int"
+            print(f"{prefix}WriteFunction | type: {typ}")
             print_expr_decorated(node[1], indent + 1)
             print_expr_decorated(node[2], indent + 1)
         else:
