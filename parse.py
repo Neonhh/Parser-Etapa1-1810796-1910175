@@ -677,7 +677,7 @@ def analyze_context(node, symtable=None):
         col = node[4] if len(node) > 4 else None
         if vartype is None:
             raise Exception(
-                f"Use of undeclared variable '{varname}' at line {line} and column {col}"
+                f"Variable {varname} not declared at line {line} and column {col}"
             )
         expr, exprtype = analyze_expr(node[2], symtable)
         if not type_compatible(vartype, exprtype):
@@ -877,22 +877,28 @@ def print_expr_decorated(node, indent=0):
                 else:
                     return 1
 
-            if op == "Comma":  
+            if op == "Comma":
                 length = get_tuple_length(node)
                 # Primero imprimir todos los operadores Comma anidados
                 current = node
                 current_indent = indent
-                while isinstance(current, tuple) and current[0] == "binop" and current[1] == ",":
-                    print(f"{'-' * current_indent}Comma | type: function with length={length}")
+                while (
+                    isinstance(current, tuple)
+                    and current[0] == "binop"
+                    and current[1] == ","
+                ):
+                    print(
+                        f"{'-' * current_indent}Comma | type: function with length={length}"
+                    )
                     current = current[3]  # Avanzar al siguiente operando izquierdo
                     current_indent += 1
                     length -= 1
-                
+
                 # Luego imprimir los operandos hoja
                 def print_operands(n, op_indent):
                     if isinstance(n, tuple) and n[0] == "binop" and n[1] == ",":
                         print_operands(n[2], op_indent)
-                        print_operands(n[3], op_indent-1)
+                        print_operands(n[3], op_indent - 1)
                     else:
                         print_expr_decorated(n, op_indent)
 
