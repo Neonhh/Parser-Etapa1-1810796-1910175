@@ -758,7 +758,7 @@ def print_expr_decorated(node, indent=0):
             print(f"{prefix}Not | type: bool")
             print_expr_decorated(node[1], indent + 1)
         elif tag == "app":
-            print(f"{prefix}App | type: int")
+            print(f"{prefix}ReadFunction | type: int")
             print_expr_decorated(node[1], indent + 1)
             print_expr_decorated(node[2], indent + 1)
         elif tag == "call":
