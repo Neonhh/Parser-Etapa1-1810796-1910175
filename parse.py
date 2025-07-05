@@ -673,7 +673,7 @@ def print_decorated_ast(node, indent=0, sequenced=False):
                     return
                 if len(nodes) == 1:
                     # Si solo hay un nodo, procesarlo directamente
-                    print_decorated_ast(nodes[0], current_indent + 1)
+                    print_decorated_ast(nodes[0], current_indent)
                 else:
                     print(f"{'-' * current_indent}Sequencing")
                     # Procesar el resto de los nodos recursivamente
