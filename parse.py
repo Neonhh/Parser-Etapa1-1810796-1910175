@@ -275,7 +275,7 @@ def print_ast(node, indent=0, sequenced=False):
             print(f"{prefix}Print")
             print_ast(node[1], indent + 1)
         elif tag == "skip":
-            print(f"{prefix}Skip")
+            print(f"{prefix}skip")
         elif tag == "while":
             print(f"{prefix}While")
             print(f"{prefix}-Then")
@@ -617,7 +617,7 @@ def analyze_context(node, symtable=None):
         return ("Print", (expr, exprtype))
 
     elif tag == "skip":
-        return ("Skip",)
+        return ("skip",)
 
     elif tag == "while":
         cond, condtype = analyze_expr(node[1], symtable)
@@ -673,8 +673,8 @@ def print_decorated_ast(node, indent=0, sequenced=False):
         elif tag == "Print":
             print(f"{prefix}Print")
             print_expr_decorated(node[1][0], indent + 1)
-        elif tag == "Skip":
-            print(f"{prefix}Skip")
+        elif tag == "skip":
+            print(f"{prefix}skip")
         elif tag == "While":
             print(f"{prefix}While")
             print(f"{prefix}-Then")
