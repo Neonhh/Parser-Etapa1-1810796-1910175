@@ -854,13 +854,6 @@ def main():
             sys.exit(1)
 
         # Si todo fue exitoso, imprime los resultados
-        print("AST sin formato:")
-        print(result)
-        print("AST sin decorar:")
-        print_ast(result)
-        print("\nTabla de símbolos:")
-        print(decorated)
-        print("\nAST decorado:")
         print_decorated_ast(decorated)
 
     except FileNotFoundError:
