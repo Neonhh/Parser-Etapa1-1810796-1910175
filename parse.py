@@ -548,15 +548,11 @@ def analyze_expr(node, symtable):
             return ("binop", op, left, right, line, col), "int"
         elif op in ["and", "or"]:
             if ltype != "bool" or rtype != "bool":
-                raise Exception(
-                    f"Type error: logical operations require bool at line {line} and column {col}"
-                )
+                raise Exception(f"Type error at line {line} and column {col}")
             return ("binop", op, left, right, line, col), "bool"
         elif op in ["==", "<>", "<", ">", "<=", ">="]:
             if ltype != rtype:
-                raise Exception(
-                    f"Type error: comparison requires same type at line {line} and column {col}"
-                )
+                raise Exception(f"Type error at line {line} and column {col}")
             return ("binop", op, left, right, line, col), "bool"
         elif op == ",":
             # Para funciones, devolver tipo especial
