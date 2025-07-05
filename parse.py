@@ -354,7 +354,7 @@ def print_ast(node, indent=0, sequenced=False):
 
             if op == "Comma":
                 length = get_tuple_length(node)
-                print(f"{prefix}Comma | type: function with length={length}")
+                print(f"{prefix}Comma | type: function with length BB={length}")
                 print_expr_decorated(node[2], indent + 1)
                 print_expr_decorated(node[3], indent + 1)
             elif op == "TwoPoints":
@@ -872,11 +872,27 @@ def print_expr_decorated(node, indent=0):
                 else:
                     return 1
 
-            if op == "Comma":
+            if op == "Comma":  
                 length = get_tuple_length(node)
-                print(f"{prefix}Comma | type: function with length={length}")
-                print_expr_decorated(node[2], indent + 1)
-                print_expr_decorated(node[3], indent + 1)
+                # Primero imprimir todos los operadores Comma anidados
+                current = node
+                current_indent = indent
+                while isinstance(current, tuple) and current[0] == "binop" and current[1] == ",":
+                    print(f"{'-' * current_indent}Comma | type: function with length={length}")
+                    current = current[3]  # Avanzar al siguiente operando izquierdo
+                    current_indent += 1
+                    length -= 1
+                
+                # Luego imprimir los operandos hoja
+                def print_operands(n, op_indent):
+                    if isinstance(n, tuple) and n[0] == "binop" and n[1] == ",":
+                        print_operands(n[2], op_indent)
+                        print_operands(n[3], op_indent-1)
+                    else:
+                        print_expr_decorated(n, op_indent)
+
+                print_operands(node[2], current_indent)
+                print_operands(node[3], current_indent)
             elif op == "TwoPoints":
                 print(f"{prefix}TwoPoints")
                 print_expr_decorated(node[2], indent + 1)
