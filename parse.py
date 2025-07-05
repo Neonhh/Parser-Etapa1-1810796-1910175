@@ -808,26 +808,21 @@ def main():
         if hasattr(lexer, "errors"):
             del lexer.errors
 
-        result = parser.parse(data, lexer=lexer)
-        # Imprime el AST sin formato
-        print("AST sin formato:")
-        print(result)
-
-        # Imprime el AST sin decorar
-        print("AST sin decorar:")
-        print_ast(result)
-
-        # Análisis de contexto y verificación de tipos
+        # Procesa el parseo y análisis, pero no imprimas nada aún
         try:
+            result = parser.parse(data, lexer=lexer)
             decorated = analyze_context(result)
-            # Imprime la tabla de símbolos
-            print("\nTabla de símbolos:")
-            print(decorated)
         except Exception as e:
             print(e)
             sys.exit(1)
 
-        # Imprime el AST decorado y la tabla de símbolos
+        # Si todo fue exitoso, imprime los resultados
+        print("AST sin formato:")
+        print(result)
+        print("AST sin decorar:")
+        print_ast(result)
+        print("\nTabla de símbolos:")
+        print(decorated)
         print("\nAST decorado:")
         print_decorated_ast(decorated)
 
