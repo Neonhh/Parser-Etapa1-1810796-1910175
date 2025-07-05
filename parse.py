@@ -469,7 +469,21 @@ def analyze_expr(node, symtable):
         op = node[1]
         left, ltype = analyze_expr(node[2], symtable)
         right, rtype = analyze_expr(node[3], symtable)
-        if op in ["+", "-", "*"]:
+        if op == "+":
+            # Permitir string+int, int+string, string+string
+            if (
+                (ltype == "string" and rtype == "string")
+                or (ltype == "string" and rtype == "int")
+                or (ltype == "int" and rtype == "string")
+            ):
+                return ("Concat", left, right), "string"
+            elif ltype == "int" and rtype == "int":
+                return ("binop", op, left, right), "int"
+            else:
+                raise Exception(
+                    "Type error: '+' requires both operands to be int or at least one to be string"
+                )
+        elif op in ["-", "*"]:
             if ltype != "int" or rtype != "int":
                 raise Exception("Type error: arithmetic operations require int")
             return ("binop", op, left, right), "int"
@@ -483,7 +497,26 @@ def analyze_expr(node, symtable):
             return ("binop", op, left, right), "bool"
         elif op == ",":
             # Para funciones, devolver tipo especial
-            return ("binop", op, left, right), "function with length=2"
+            # Soportar tuplas de más de dos elementos
+            if ltype.startswith("function with length="):
+                llen = int(ltype.split("=")[1])
+                if rtype == "int":
+                    rlen = 1
+                elif rtype.startswith("function with length="):
+                    rlen = int(rtype.split("=")[1])
+                else:
+                    rlen = 1
+                total_len = llen + rlen
+            elif ltype == "int":
+                if rtype == "int":
+                    total_len = 2
+                elif rtype.startswith("function with length="):
+                    total_len = 1 + int(rtype.split("=")[1])
+                else:
+                    total_len = 2
+            else:
+                total_len = 2
+            return ("binop", op, left, right), f"function with length={total_len}"
         elif op == ":":
             return ("binop", op, left, right), "TwoPoints"
         else:
@@ -713,11 +746,15 @@ def print_expr_decorated(node, indent=0):
         elif tag == "num":
             print(f"{prefix}Literal: {node[1]} | type: int")
         elif tag == "string":
-            print(f"{prefix}String: {node[1]} | type: string")
+            print(f"{prefix}String: {node[1]}")
         elif tag == "true":
             print(f"{prefix}Literal: true | type: bool")
         elif tag == "false":
             print(f"{prefix}Literal: false | type: bool")
+        elif tag == "Concat":
+            print(f"{prefix}Concat | type: String")
+            print_expr_decorated(node[1], indent + 1)
+            print_expr_decorated(node[2], indent + 1)
         elif tag == "binop":
             op_map = {
                 "+": "Plus",
