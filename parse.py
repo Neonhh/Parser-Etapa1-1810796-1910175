@@ -188,7 +188,22 @@ def p_E_atom(p):
 
 def p_atom_app(p):
     "atom : atom TkApp simple_atom"
-    p[0] = ("app", p[1], p[3])
+
+    def get_line_col(expr):
+        # Elimina el print de debug, solo retorna la posición
+        if isinstance(expr, tuple):
+            if (
+                len(expr) >= 4
+                and isinstance(expr[-2], int)
+                and isinstance(expr[-1], int)
+            ):
+                return expr[-2], expr[-1]
+            if len(expr) >= 3 and isinstance(expr[1], int) and isinstance(expr[2], int):
+                return expr[1], expr[2]
+        return None, None
+
+    line, col = get_line_col(p[3])
+    p[0] = ("app", p[1], p[3], line, col)
 
 
 def p_atom_simple(p):
@@ -211,12 +226,16 @@ def p_simple_atom_num(p):
 
 def p_simple_atom_true(p):
     "simple_atom : TkTrue"
-    p[0] = ("true",)
+    line = p.lineno(1)
+    col = find_column(p.lexer.lexdata, p.lexpos(1))
+    p[0] = ("true", line, col)
 
 
 def p_simple_atom_false(p):
     "simple_atom : TkFalse"
-    p[0] = ("false",)
+    line = p.lineno(1)
+    col = find_column(p.lexer.lexdata, p.lexpos(1))
+    p[0] = ("false", line, col)
 
 
 def p_simple_atom_string(p):
@@ -470,11 +489,21 @@ def type_compatible(declared, exprtype):
 # Decoración y verificación de tipos en expresiones
 def analyze_expr(node, symtable):
     tag = node[0]
-    if tag == "id":
+    if tag == "true":
+        if len(node) >= 3 and isinstance(node[1], int) and isinstance(node[2], int):
+            return ("true", "bool", node[1], node[2]), "bool"
+        else:
+            return ("true", "bool"), "bool"
+    elif tag == "false":
+        if len(node) >= 3 and isinstance(node[1], int) and isinstance(node[2], int):
+            return ("false", "bool", node[1], node[2]), "bool"
+        else:
+            return ("false", "bool"), "bool"
+    elif tag == "id":
         name = node[1]
         # Extraer línea y columna si están presentes
-        line = node[2] if len(node) > 2 else None
-        col = node[3] if len(node) > 3 else None
+        line = node[2] if len(node) > 2 and isinstance(node[2], int) else None
+        col = node[3] if len(node) > 3 and isinstance(node[3], int) else None
         typ = symtable.lookup(name)
         if typ is None:
             if line is not None and col is not None:
@@ -483,19 +512,22 @@ def analyze_expr(node, symtable):
                 )
             else:
                 raise Exception(f"Variable not declared: {name}")
-        return ("id", name, typ), typ
+        # Devuelve el nodo decorado conservando línea y columna si existen
+        if line is not None and col is not None:
+            return ("id", name, typ, line, col), typ
+        else:
+            return ("id", name, typ), typ
     elif tag == "num":
         return ("num", node[1], "int"), "int"
-    elif tag == "true":
-        return ("true", "bool"), "bool"
-    elif tag == "false":
-        return ("false", "bool"), "bool"
     elif tag == "string":
         return ("string", node[1], "string"), "string"
     elif tag == "binop":
         op = node[1]
         left, ltype = analyze_expr(node[2], symtable)
         right, rtype = analyze_expr(node[3], symtable)
+        # Extrae línea y columna del nodo binop (posición del operador)
+        line = node[4] if len(node) > 4 else None
+        col = node[5] if len(node) > 5 else None
         if op == "+":
             # Permitir string+int, int+string, string+string
             if (
@@ -505,32 +537,37 @@ def analyze_expr(node, symtable):
             ):
                 return ("Concat", left, right), "string"
             elif ltype == "int" and rtype == "int":
-                return ("binop", op, left, right), "int"
+                return ("binop", op, left, right, line, col), "int"
             else:
-                # Extrae línea y columna del nodo binop (posición del '+')
-                line = node[4] if len(node) > 4 else None
-                col = node[5] if len(node) > 5 else None
                 raise Exception(f"Type error at line {line} and column {col}")
         elif op in ["-", "*"]:
             if ltype != "int" or rtype != "int":
-                raise Exception("Type error: arithmetic operations require int")
+                raise Exception(
+                    f"Type error: arithmetic operations require int at line {line} and column {col}"
+                )
             return ("binop", op, left, right, line, col), "int"
         elif op in ["and", "or"]:
             if ltype != "bool" or rtype != "bool":
-                raise Exception("Type error: logical operations require bool")
+                raise Exception(
+                    f"Type error: logical operations require bool at line {line} and column {col}"
+                )
             return ("binop", op, left, right, line, col), "bool"
         elif op in ["==", "<>", "<", ">", "<=", ">="]:
             if ltype != rtype:
-                raise Exception("Type error: comparison requires same type")
+                raise Exception(
+                    f"Type error: comparison requires same type at line {line} and column {col}"
+                )
             return ("binop", op, left, right, line, col), "bool"
         elif op == ",":
             # Para funciones, devolver tipo especial
             # Soportar tuplas de más de dos elementos
-            if ltype.startswith("function with length="):
+            if isinstance(ltype, str) and ltype.startswith("function with length="):
                 llen = int(ltype.split("=")[1])
                 if rtype == "int":
                     rlen = 1
-                elif rtype.startswith("function with length="):
+                elif isinstance(rtype, str) and rtype.startswith(
+                    "function with length="
+                ):
                     rlen = int(rtype.split("=")[1])
                 else:
                     rlen = 1
@@ -538,7 +575,9 @@ def analyze_expr(node, symtable):
             elif ltype == "int":
                 if rtype == "int":
                     total_len = 2
-                elif rtype.startswith("function with length="):
+                elif isinstance(rtype, str) and rtype.startswith(
+                    "function with length="
+                ):
                     total_len = 1 + int(rtype.split("=")[1])
                 else:
                     total_len = 2
@@ -572,17 +611,21 @@ def analyze_expr(node, symtable):
         left, ltype = analyze_expr(node[1], symtable)
         right, rtype = analyze_expr(node[2], symtable)
         # Para este lenguaje, asumimos que app solo se usa con funciones
-        if not ltype.startswith("function[.."):
+        if not (isinstance(ltype, str) and ltype.startswith("function[..")):
             raise Exception("Type error: app requires function on left")
-
+        # Validar que el índice sea int
+        if rtype != "int":
+            line = node[3] if len(node) > 3 else None
+            col = node[4] if len(node) > 4 else None
+            raise Exception(
+                f"Error. Not integer index for function at line {line} and column {col}"
+            )
         return ("app", left, right, "int"), "int"  # Suponemos que retorna int
     elif tag == "call":
         left, ltype = analyze_expr(node[1], symtable)
         right, rtype = analyze_expr(node[2], symtable)
-
-        if not ltype.startswith("function[.."):
+        if not (isinstance(ltype, str) and ltype.startswith("function[..")):
             raise Exception("Type error: call requires function on left")
-
         return (
             "call",
             left,
@@ -792,7 +835,8 @@ def print_expr_decorated(node, indent=0):
         tag = node[0]
         # Si el nodo ya viene decorado con tipo
         if tag == "id":
-            if len(node) == 3:
+            # Imprime el tipo si está en la posición 2 (aunque haya más elementos)
+            if len(node) > 2 and isinstance(node[2], str):
                 print(f"{prefix}Ident: {node[1]} | type: {node[2]}")
             else:
                 print(f"{prefix}Ident: {node[1]}")
