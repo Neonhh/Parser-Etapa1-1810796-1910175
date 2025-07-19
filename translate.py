@@ -30,6 +30,69 @@ do = lambda exp: lambda f: Z(lift_do(exp)(f))
     
     return output_filename
 
+def traduce_to_lambda(node,lambda_state =[],current_lambda=''):
+    """ 
+    Recibe el AST y genera las instrucciones correspondientes para lambda-calculo en python
+    """
+
+    if isinstance(node,tuple):
+        tag = node[0]
+
+        if tag=="Block":
+            for var in node[1].symbols.keys():
+                lambda_state.append(var)
+            
+            traduce_to_lambda(node[2][1:],lambda_state,'') #El primer elemento tiene el tag declare y no lo necesitamos
+        
+        elif tag=="Asig":
+            changed_var = node[1][0]
+            new_val = node[2][0][1]
+
+            new_state = ''
+            for var in lambda_state:
+                new_state = f'lambda {var}:{new_state}'
+            
+            state_string = 'nil'
+            for var in lambda_state:
+                if var == changed_var:
+                    var = new_val
+                    
+                state_string = f'cons({var}) ({state_string})'
+
+            new_state = f'apply({new_state} {state_string})'
+            
+            print(new_state)
+            return new_state
+
+    
+    if isinstance(node,list):
+        if not node:
+            return
+        if len(node) == 1:
+            traduce_to_lambda(node[0],lambda_state,'')
+        
+        else:
+            def process_nested_sequencing(nodes, lambda_state, current_seq = ''):
+                """Procesa una lista de nodos y los organiza en secuencias anidadas."""
+                if not nodes:
+                    return
+                if len(nodes) == 1:
+                    # Si solo hay un nodo, procesarlo directamente   
+                    return f'{current_seq} ({traduce_to_lambda(nodes[0], lambda_state)} x1)'
+                elif len(nodes) == 2:
+                    return f'{current_seq} (lambda x1: {traduce_to_lambda(nodes[1], lambda_state)} ({traduce_to_lambda(nodes[0], lambda_state)} x1))'
+                else:
+                    # Procesar el resto de los nodos recursivamente
+                    return process_nested_sequencing(nodes[:-2], lambda_state,current_seq=f"{current_seq}(lambda x1: {traduce_to_lambda(nodes[-1], lambda_state)} (lambda x1: {traduce_to_lambda(nodes[-1], lambda_state)} x1)) ")
+                
+                #process_nested_sequencing(nodes[:-1], lambda_state, 
+                 #                             current_seq=f'{current_seq} {traduce_to_lambda(nodes[-1], lambda_state)}')
+            
+            seq = process_nested_sequencing(node, lambda_state)
+            seq = f'({seq})'
+            print(seq)
+
+
 def main():
     if len(sys.argv) != 2:
         print("Uso: python parse.py <archivo.imperat>")
@@ -48,6 +111,11 @@ def main():
             data = file.read()
             result, decorated = generate_AST(data)
 
+            print(result)
+            print()
+            print(decorated)
+
+            traduce_to_lambda(decorated)
             generate_python_file('prueb', '')
 
     except FileNotFoundError:
