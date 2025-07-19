@@ -30,6 +30,113 @@ do = lambda exp: lambda f: Z(lift_do(exp)(f))
     
     return output_filename
 
+def traduce_expression(node):
+    """Traduce una expresion dentro de una instruccion a lambda calculo"""
+    if isinstance(node, tuple):
+        tag = node[0]
+        # Si el nodo ya viene decorado con tipo
+        if tag == "id":
+            # Imprime el tipo si está en la posición 2 (aunque haya más elementos)
+            return node[1]
+        elif tag == "num":
+            return node[1]
+        elif tag == "string":
+            print(f"String: ")
+        elif tag == "true":
+            print(f"iteral: true | type: bool")
+        elif tag == "false":
+            print(f"iteral: false | type: bool")
+        elif tag == "Concat":
+            print(f"Concat | type: String")
+
+
+        elif tag == "binop":
+            op_map = {
+                "+": "Plus",
+                "-": "Minus",
+                "*": "Mult",
+                "and": "And",
+                "or": "Or",
+                "==": "Equal",
+                "<>": "NotEqual",
+                "<": "Less",
+                ">": "Greater",
+                "<=": "Leq",
+                ">=": "Geq",
+                ",": "Comma",
+                ":": "TwoPoints",
+            }
+            op = op_map.get(node[1], node[1])
+
+            def get_tuple_length(n):
+                if isinstance(n, tuple) and n[0] == "binop" and n[1] == ",":
+                    return get_tuple_length(n[2]) + get_tuple_length(n[3])
+                else:
+                    return 1
+
+            if op == "Comma":
+                length = get_tuple_length(node)
+                # Primero imprimir todos los operadores Comma anidados
+                current = node
+                while (
+                    isinstance(current, tuple)
+                    and current[0] == "binop"
+                    and current[1] == ","
+                ):
+                    print(
+                        f"{'-' * current_indent}Comma | type: function with length={length}"
+                    )
+                    current = current[3]  # Avanzar al siguiente operando izquierdo
+                    current_indent += 1
+                    length -= 1
+
+                # Luego imprimir los operandos hoja
+                def print_operands(n, op_indent):
+                    if isinstance(n, tuple) and n[0] == "binop" and n[1] == ",":
+                        print_operands(n[2], op_indent)
+                        print_operands(n[3], op_indent - 1)
+                    #else:
+                        #print_expr_decorated(n, op_indent)
+
+                print_operands(node[2], current_indent)
+                print_operands(node[3], current_indent)
+            elif op == "TwoPoints":
+                print(f"TwoPoints")
+                #print_expr_decorated(node[2], indent + 1)
+                #print_expr_decorated(node[3], indent + 1)
+            else:
+                
+                return f"{traduce_expression(node[2])} {node[1]} {traduce_expression(node[3])}"
+
+                #print_expr_decorated(node[2], indent + 1)
+                #print_expr_decorated(node[3], indent + 1)
+        elif tag == "uminus":
+            return f'-{traduce_expression(node[1])}'
+            #print_expr_decorated(node[1], indent + 1)
+        elif tag == "not":
+            print(f"{prefix}Not | type: bool")
+            #print_expr_decorated(node[1], indent + 1)
+        elif tag == "app":
+            print(f"{prefix}ReadFunction | type: int")
+            #print_expr_decorated(node[1], indent + 1)
+            #print_expr_decorated(node[2], indent + 1)
+        elif tag == "call":
+            # Imprime el tipo real de la función
+            typ = node[3] if len(node) > 3 else "int"
+            print(f"{prefix}WriteFunction | type: {typ}")
+            #print_expr_decorated(node[1], indent + 1)
+            #print_expr_decorated(node[2], indent + 1)
+        else:
+            # Cualquier otro nodo
+            print(f"{tag}")
+            #for child in node[1:]:
+                #print_expr_decorated(child, indent + 1)
+    #elif isinstance(node, list):
+        #for n in node:
+            #print_expr_decorated(n, indent)
+    else:
+        print(f"{node}")
+
 def traduce_to_lambda(node,lambda_state =[],current_lambda=''):
     """ 
     Recibe el AST y genera las instrucciones correspondientes para lambda-calculo en python
@@ -46,7 +153,8 @@ def traduce_to_lambda(node,lambda_state =[],current_lambda=''):
         
         elif tag=="Asig":
             changed_var = node[1][0]
-            new_val = node[2][0][1]
+
+            new_val = traduce_expression(node[2][0])
 
             new_state = ''
             for var in lambda_state:
@@ -60,7 +168,8 @@ def traduce_to_lambda(node,lambda_state =[],current_lambda=''):
                 state_string = f'cons({var}) ({state_string})'
 
             new_state = f'apply({new_state} {state_string})'
-            
+
+
             print(new_state)
             return new_state
 
@@ -83,10 +192,8 @@ def traduce_to_lambda(node,lambda_state =[],current_lambda=''):
                     return f'{current_seq} (lambda x1: {traduce_to_lambda(nodes[1], lambda_state)} ({traduce_to_lambda(nodes[0], lambda_state)} x1))'
                 else:
                     # Procesar el resto de los nodos recursivamente
-                    return process_nested_sequencing(nodes[:-2], lambda_state,current_seq=f"{current_seq}(lambda x1: {traduce_to_lambda(nodes[-1], lambda_state)} (lambda x1: {traduce_to_lambda(nodes[-1], lambda_state)} x1)) ")
+                    return process_nested_sequencing(nodes[:-2], lambda_state,current_seq=f"{current_seq}(lambda x1: {traduce_to_lambda(nodes[-1], lambda_state)} (lambda x1: {traduce_to_lambda(nodes[-2], lambda_state)} x1)) ")
                 
-                #process_nested_sequencing(nodes[:-1], lambda_state, 
-                 #                             current_seq=f'{current_seq} {traduce_to_lambda(nodes[-1], lambda_state)}')
             
             seq = process_nested_sequencing(node, lambda_state)
             seq = f'({seq})'
@@ -111,9 +218,8 @@ def main():
             data = file.read()
             result, decorated = generate_AST(data)
 
-            print(result)
-            print()
             print(decorated)
+            print()
 
             traduce_to_lambda(decorated)
             generate_python_file('prueb', '')
