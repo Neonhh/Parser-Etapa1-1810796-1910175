@@ -955,6 +955,30 @@ def find_column(input, lexpos):
     return lexpos - last_newline
 
 
+def generate_AST(data):
+    
+    lexer.input(data)
+    lexer.lineno = 1
+    # Limpia errores previos del lexer si existen
+    if hasattr(lexer, "errors"):
+        del lexer.errors
+
+    # Procesa el parseo y análisis, pero no imprimas nada aún
+    try:
+        result = parser.parse(data, lexer=lexer)
+        #print(f'Resultado: \n{result}')
+        decorated = analyze_context(result)
+        #print(f'Decorado: \n{decorated}')
+    except Exception as e:
+        print(e)
+        sys.exit(1)
+
+    # Si todo fue exitoso, imprime los resultados
+    # print_decorated_ast(decorated)
+
+    return result, decorated
+
+
 def main():
     # Procesamiento del input por consola
     if len(sys.argv) != 2:
