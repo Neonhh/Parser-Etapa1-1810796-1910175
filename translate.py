@@ -3,10 +3,11 @@ from parse import SymbolTable, generate_AST
 import ply.yacc as yacc
 from lexer import lexer, tokens
 
+
 def generate_python_file(input_filename, translated_code):
     # Genera el nombre del archivo de salida
     output_filename = f"{input_filename.replace('.imperat', '')}_output.py"
-    
+
     # Definiciones iniciales requeridas
     preamble = """# Definiciones básicas de lambda cálculo
 Z = lambda g: (lambda x: g(lambda v: x(x)(v)))(lambda x: g(lambda v: x(x)(v)))
@@ -24,11 +25,12 @@ do = lambda exp: lambda f: Z(lift_do(exp)(f))
 """
 
     # Escribe el archivo
-    with open(output_filename, 'w', encoding='utf-8') as f:
+    with open(output_filename, "w", encoding="utf-8") as f:
         f.write(preamble)
-        f.write(f'program= {translated_code}')
-    
+        f.write(f"program = {translated_code}")
+
     return output_filename
+
 
 def traduce_expression(node):
     """Traduce una expresion dentro de una instruccion a lambda calculo"""
@@ -41,14 +43,13 @@ def traduce_expression(node):
         elif tag == "num":
             return node[1]
         elif tag == "string":
-            print(f"String: ")
+            print("String: ")
         elif tag == "true":
-            print(f"iteral: true | type: bool")
+            print("iteral: true | type: bool")
         elif tag == "false":
-            print(f"iteral: false | type: bool")
+            print("iteral: false | type: bool")
         elif tag == "Concat":
-            print(f"Concat | type: String")
-
+            print("Concat | type: String")
 
         elif tag == "binop":
             op_map = {
@@ -83,11 +84,12 @@ def traduce_expression(node):
                     and current[0] == "binop"
                     and current[1] == ","
                 ):
-                    print(
-                        f"{'-' * current_indent}Comma | type: function with length={length}"
-                    )
+                    # print(
+                    #     f"{'-' * current_indent}Comma | type: function with length={length}"
+                    # )
+                    print(f"{'-'}Comma | type: function with length={length}")
                     current = current[3]  # Avanzar al siguiente operando izquierdo
-                    current_indent += 1
+                    # current_indent += 1
                     length -= 1
 
                 # Luego imprimir los operandos hoja
@@ -95,115 +97,124 @@ def traduce_expression(node):
                     if isinstance(n, tuple) and n[0] == "binop" and n[1] == ",":
                         print_operands(n[2], op_indent)
                         print_operands(n[3], op_indent - 1)
-                    #else:
-                        #print_expr_decorated(n, op_indent)
+                    # else:
+                    # print_expr_decorated(n, op_indent)
 
-                print_operands(node[2], current_indent)
-                print_operands(node[3], current_indent)
+                # print_operands(node[2], current_indent)
+                # print_operands(node[3], current_indent)
+                print_operands(node[2], 0)
+                print_operands(node[3], 0)
             elif op == "TwoPoints":
-                print(f"TwoPoints")
-                #print_expr_decorated(node[2], indent + 1)
-                #print_expr_decorated(node[3], indent + 1)
+                print("TwoPoints")
+                # print_expr_decorated(node[2], indent + 1)
+                # print_expr_decorated(node[3], indent + 1)
             else:
-                
                 return f"{traduce_expression(node[2])} {node[1]} {traduce_expression(node[3])}"
 
-                #print_expr_decorated(node[2], indent + 1)
-                #print_expr_decorated(node[3], indent + 1)
+                # print_expr_decorated(node[2], indent + 1)
+                # print_expr_decorated(node[3], indent + 1)
         elif tag == "uminus":
-            return f'-{traduce_expression(node[1])}'
-            #print_expr_decorated(node[1], indent + 1)
+            return f"-{traduce_expression(node[1])}"
+            # print_expr_decorated(node[1], indent + 1)
         elif tag == "not":
-            print(f"{prefix}Not | type: bool")
-            #print_expr_decorated(node[1], indent + 1)
+            # print(f"{prefix}Not | type: bool")
+            print("Not | type: bool")
+            # print_expr_decorated(node[1], indent + 1)
         elif tag == "app":
-            print(f"{prefix}ReadFunction | type: int")
-            #print_expr_decorated(node[1], indent + 1)
-            #print_expr_decorated(node[2], indent + 1)
+            # print(f"{prefix}ReadFunction | type: int")
+            print("ReadFunction | type: int")
+            # print_expr_decorated(node[1], indent + 1)
+            # print_expr_decorated(node[2], indent + 1)
         elif tag == "call":
             # Imprime el tipo real de la función
             typ = node[3] if len(node) > 3 else "int"
-            print(f"{prefix}WriteFunction | type: {typ}")
-            #print_expr_decorated(node[1], indent + 1)
-            #print_expr_decorated(node[2], indent + 1)
+            # print(f"{prefix}WriteFunction | type: {typ}")
+            print(f"WriteFunction | type: {typ}")
+            # print_expr_decorated(node[1], indent + 1)
+            # print_expr_decorated(node[2], indent + 1)
         else:
             # Cualquier otro nodo
             print(f"{tag}")
-            #for child in node[1:]:
-                #print_expr_decorated(child, indent + 1)
-    #elif isinstance(node, list):
-        #for n in node:
-            #print_expr_decorated(n, indent)
+            # for child in node[1:]:
+            # print_expr_decorated(child, indent + 1)
+    # elif isinstance(node, list):
+    # for n in node:
+    # print_expr_decorated(n, indent)
     else:
         print(f"{node}")
 
-def traduce_to_lambda(node,lambda_state =[],current_lambda=''):
-    """ 
+
+def traduce_to_lambda(node, lambda_state=[], current_lambda=""):
+    """
     Recibe el AST y genera las instrucciones correspondientes para lambda-calculo en python
     """
 
-    if isinstance(node,tuple):
+    if isinstance(node, tuple):
         tag = node[0]
 
-        if tag=="Block":
+        if tag == "Block":
             for var in node[1].symbols.keys():
                 lambda_state.append(var)
-            
-            return traduce_to_lambda(node[2][1:],lambda_state,'') #El primer elemento tiene el tag declare y no lo necesitamos
-        
-        elif tag=="Asig":
+
+            return traduce_to_lambda(
+                node[2][1:], lambda_state, ""
+            )  # El primer elemento tiene el tag declare y no lo necesitamos
+
+        elif tag == "Asig":
             changed_var = node[1][0]
 
             new_val = traduce_expression(node[2][0])
 
-            new_state = ''
+            new_state = ""
             for var in lambda_state:
-                new_state = f'lambda {var}:{new_state}'
-            
-            state_string = 'nil'
+                new_state = f"lambda {var}:{new_state}"
+
+            state_string = "nil"
             for var in lambda_state:
                 if var == changed_var:
                     var = new_val
-                    
-                state_string = f'cons({var}) ({state_string})'
 
-            new_state = f'apply({new_state} {state_string})'
+                state_string = f"cons({var}) ({state_string})"
 
+            new_state = f"apply({new_state} {state_string})"
 
             print(new_state)
             return new_state
 
-    
-    if isinstance(node,list):
+    if isinstance(node, list):
         if not node:
             return
         if len(node) == 1:
-           return traduce_to_lambda(node[0],lambda_state,'')
-        
+            return traduce_to_lambda(node[0], lambda_state, "")
+
         else:
-            def process_nested_sequencing(nodes, lambda_state, current_seq = ''):
+
+            def process_nested_sequencing(nodes, lambda_state, current_seq=""):
                 """Procesa una lista de nodos y los organiza en secuencias anidadas."""
                 if not nodes:
                     return
                 if len(nodes) == 1:
-                    # Si solo hay un nodo, procesarlo directamente   
-                    return f'{current_seq}({traduce_to_lambda(nodes[0], lambda_state)} (x1)) '
+                    # Si solo hay un nodo, procesarlo directamente
+                    return f"{current_seq}({traduce_to_lambda(nodes[0], lambda_state)} (x1)) "
                 elif len(nodes) == 2:
-                    return f'{current_seq}(lambda x1: {traduce_to_lambda(nodes[1], lambda_state)} ({traduce_to_lambda(nodes[0], lambda_state)} (x1))) '
+                    return f"{current_seq}(lambda x1: {traduce_to_lambda(nodes[1], lambda_state)} ({traduce_to_lambda(nodes[0], lambda_state)} (x1))) "
                 else:
                     # Procesar el resto de los nodos recursivamente
-                    return process_nested_sequencing(nodes[:-2], lambda_state,current_seq=f"{current_seq}(lambda x1: {traduce_to_lambda(nodes[-1], lambda_state)} (lambda x1: {traduce_to_lambda(nodes[-2], lambda_state)} (x1))) ")
-                
-            
+                    return process_nested_sequencing(
+                        nodes[:-2],
+                        lambda_state,
+                        current_seq=f"{current_seq}(lambda x1: {traduce_to_lambda(nodes[-1], lambda_state)} (lambda x1: {traduce_to_lambda(nodes[-2], lambda_state)} (x1))) ",
+                    )
+
             seq = process_nested_sequencing(node, lambda_state)
-            seq = f'{seq}'
+            seq = f"{seq}"
             print(seq)
-            return(seq)
+            return seq
 
 
 def main():
     if len(sys.argv) != 2:
-        print("Uso: python parse.py <archivo.imperat>")
+        print("Uso: python translate.py <archivo.imperat>")
         sys.exit(1)
 
     filename = sys.argv[1]
@@ -228,6 +239,7 @@ def main():
     except FileNotFoundError:
         print(f"Error: El archivo '{filename}' no existe.")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

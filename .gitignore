@@ -178,3 +178,5 @@ pyrightconfig.json
 parser.out
 parsetab.py
 CasosDePrueba-Etapa3/*
+etapa*.pdf
+ejemplo*output.py
