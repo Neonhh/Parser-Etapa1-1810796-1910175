@@ -5,7 +5,7 @@ from lexer import lexer, tokens
 
 def generate_python_file(input_filename, translated_code):
     # Genera el nombre del archivo de salida
-    output_filename = f"{input_filename.replace('.input', '')}_output.py"
+    output_filename = f"{input_filename.replace('.imperat', '')}_output.py"
     
     # Definiciones iniciales requeridas
     preamble = """# Definiciones básicas de lambda cálculo
@@ -26,7 +26,7 @@ do = lambda exp: lambda f: Z(lift_do(exp)(f))
     # Escribe el archivo
     with open(output_filename, 'w', encoding='utf-8') as f:
         f.write(preamble)
-        f.write(translated_code)
+        f.write(f'program= {translated_code}')
     
     return output_filename
 
@@ -149,7 +149,7 @@ def traduce_to_lambda(node,lambda_state =[],current_lambda=''):
             for var in node[1].symbols.keys():
                 lambda_state.append(var)
             
-            traduce_to_lambda(node[2][1:],lambda_state,'') #El primer elemento tiene el tag declare y no lo necesitamos
+            return traduce_to_lambda(node[2][1:],lambda_state,'') #El primer elemento tiene el tag declare y no lo necesitamos
         
         elif tag=="Asig":
             changed_var = node[1][0]
@@ -178,7 +178,7 @@ def traduce_to_lambda(node,lambda_state =[],current_lambda=''):
         if not node:
             return
         if len(node) == 1:
-            traduce_to_lambda(node[0],lambda_state,'')
+           return traduce_to_lambda(node[0],lambda_state,'')
         
         else:
             def process_nested_sequencing(nodes, lambda_state, current_seq = ''):
@@ -187,17 +187,18 @@ def traduce_to_lambda(node,lambda_state =[],current_lambda=''):
                     return
                 if len(nodes) == 1:
                     # Si solo hay un nodo, procesarlo directamente   
-                    return f'{current_seq} ({traduce_to_lambda(nodes[0], lambda_state)} x1)'
+                    return f'{current_seq}({traduce_to_lambda(nodes[0], lambda_state)} (x1)) '
                 elif len(nodes) == 2:
-                    return f'{current_seq} (lambda x1: {traduce_to_lambda(nodes[1], lambda_state)} ({traduce_to_lambda(nodes[0], lambda_state)} x1))'
+                    return f'{current_seq}(lambda x1: {traduce_to_lambda(nodes[1], lambda_state)} ({traduce_to_lambda(nodes[0], lambda_state)} (x1))) '
                 else:
                     # Procesar el resto de los nodos recursivamente
-                    return process_nested_sequencing(nodes[:-2], lambda_state,current_seq=f"{current_seq}(lambda x1: {traduce_to_lambda(nodes[-1], lambda_state)} (lambda x1: {traduce_to_lambda(nodes[-2], lambda_state)} x1)) ")
+                    return process_nested_sequencing(nodes[:-2], lambda_state,current_seq=f"{current_seq}(lambda x1: {traduce_to_lambda(nodes[-1], lambda_state)} (lambda x1: {traduce_to_lambda(nodes[-2], lambda_state)} (x1))) ")
                 
             
             seq = process_nested_sequencing(node, lambda_state)
-            seq = f'({seq})'
+            seq = f'{seq}'
             print(seq)
+            return(seq)
 
 
 def main():
@@ -221,8 +222,8 @@ def main():
             print(decorated)
             print()
 
-            traduce_to_lambda(decorated)
-            generate_python_file('prueb', '')
+            code = traduce_to_lambda(decorated)
+            generate_python_file(filename, code)
 
     except FileNotFoundError:
         print(f"Error: El archivo '{filename}' no existe.")
