@@ -3,8 +3,7 @@ from parse import SymbolTable, generate_AST
 import ply.yacc as yacc
 from lexer import lexer, tokens
 
-
-def generate_python_file(input_filename, translated_code):
+def generate_python_file(input_filename, translated_code, variables):
     # Genera el nombre del archivo de salida
     output_filename = f"{input_filename.replace('.imperat', '')}_output.py"
 
@@ -23,6 +22,14 @@ do = lambda exp: lambda f: Z(lift_do(exp)(f))
 
 # Código traducido
 """
+
+    result_stmnt = 'nil'
+    for _ in range(len(variables)):
+        result_stmnt = f'cons(0)({result_stmnt})'
+
+    result_stmnt = f'result = program({result_stmnt})'
+
+
 
     # Escribe el archivo
     with open(output_filename, "w", encoding="utf-8") as f:
@@ -155,12 +162,10 @@ def traduce_to_lambda(node, lambda_state=[], current_lambda=""):
         if tag == "Block":
             for var in node[1].symbols.keys():
                 lambda_state.append(var)
-
-            return traduce_to_lambda(
-                node[2][1:], lambda_state, ""
-            )  # El primer elemento tiene el tag declare y no lo necesitamos
-
-        elif tag == "Asig":
+            
+            return traduce_to_lambda(node[2][1:],lambda_state,'')[0], lambda_state #El primer elemento tiene el tag declare y no lo necesitamos
+        
+        elif tag=="Asig":
             changed_var = node[1][0]
 
             new_val = traduce_expression(node[2][0])
@@ -233,8 +238,8 @@ def main():
             print(decorated)
             print()
 
-            code = traduce_to_lambda(decorated)
-            generate_python_file(filename, code)
+            code, variables = traduce_to_lambda(decorated)
+            generate_python_file(filename, code, len(variables))
 
     except FileNotFoundError:
         print(f"Error: El archivo '{filename}' no existe.")
