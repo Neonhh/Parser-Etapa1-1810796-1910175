@@ -35,8 +35,6 @@ do = lambda exp: lambda f: Z(lift_do(exp)(f))
         print_lambdas += f"lambda x{i}:"
 
     print_vals = print_vals.rstrip(", ")
-
-    # El código traducido debe ser una lambda completa
     formatted_code = translated_code
 
     # Escribe el archivo de salida
@@ -59,13 +57,18 @@ def traduce_expression(node):
         elif tag == "num":
             return node[1]
         elif tag == "string":
-            print("String: ")
+            string_value = node[1]
+            if string_value.startswith('"') and string_value.endswith('"'):
+                string_value = string_value[1:-1]
+            return repr(string_value)
         elif tag == "true":
             return "true"
         elif tag == "false":
             return "false"
         elif tag == "Concat":
-            print("Concat | type: String")
+            left = traduce_expression(node[1])
+            right = traduce_expression(node[2])
+            return f"str({left}) + str({right})"
         elif tag == "binop":
             op_map = {
                 "+": "Plus",
@@ -92,18 +95,15 @@ def traduce_expression(node):
 
             if op == "Comma":
                 length = get_tuple_length(node)
-                # Imprime todos los operadores Comma anidados
                 current = node
                 while (
                     isinstance(current, tuple)
                     and current[0] == "binop"
                     and current[1] == ","
                 ):
-                    print(f"{'-'}Comma | type: function with length={length}")
                     current = current[3]
                     length -= 1
 
-                # Imprime los operandos hoja
                 def print_operands(n, op_indent):
                     if isinstance(n, tuple) and n[0] == "binop" and n[1] == ",":
                         print_operands(n[2], op_indent)
@@ -111,8 +111,9 @@ def traduce_expression(node):
 
                 print_operands(node[2], 0)
                 print_operands(node[3], 0)
+                return None
             elif op == "TwoPoints":
-                print("TwoPoints")
+                return None
             else:
                 # Para operaciones booleanas, usa equivalentes en lambda cálculo
                 if node[1] == "and":
@@ -137,17 +138,15 @@ def traduce_expression(node):
         elif tag == "uminus":
             return f"-{traduce_expression(node[1])}"
         elif tag == "not":
-            # Para operación not, usa equivalente en lambda cálculo
             return f"(lambda x: x(false)(true))({traduce_expression(node[1])})"
         elif tag == "app":
-            print("ReadFunction | type: int")
+            return None
         elif tag == "call":
-            typ = node[3] if len(node) > 3 else "int"
-            print(f"WriteFunction | type: {typ}")
+            return None
         else:
-            print(f"{tag}")
+            return None
     else:
-        print(f"{node}")
+        return node
 
 
 def traduce_condition(node, lambda_state):
@@ -207,9 +206,20 @@ def traduce_to_lambda(node, lambda_state=[], current_lambda=""):
                 state_string = f"cons({part})({state_string})"
 
             new_state = f"apply({lambda_vars}: {state_string})"
-            print(new_state)
 
             return new_state
+
+        elif tag == "Print":
+            # Maneja instrucciones de impresión
+            expr = node[1][0]
+
+            # Traduce la expresión a imprimir
+            print_expr = traduce_print_expression(expr, lambda_state)
+
+            # El print no cambia el estado, solo ejecuta la impresión
+            print_stmt = f"lambda x: (print({print_expr}) or x)"
+
+            return print_stmt
 
         elif tag == "If":
             # Maneja declaraciones condicionales con guardas
@@ -217,7 +227,7 @@ def traduce_to_lambda(node, lambda_state=[], current_lambda=""):
 
             def build_if_lambda(guards, lambda_state):
                 if not guards:
-                    return "x"  # Función identidad
+                    return "x"
 
                 guard = guards[0]
                 if guard[0] == "Guard":
@@ -240,7 +250,6 @@ def traduce_to_lambda(node, lambda_state=[], current_lambda=""):
                     return f"({instr_expr}(x) if {cond_code}(x) else {else_expr})"
 
             result = build_if_lambda(guards, lambda_state)
-            print(f"lambda x: {result}")
 
             return f"lambda x: {result}"
 
@@ -260,11 +269,9 @@ def traduce_to_lambda(node, lambda_state=[], current_lambda=""):
             if len(instructions) == 1:
                 return instructions[0]
             elif len(instructions) == 2:
-                # Composición simple para dos instrucciones
                 first = instructions[0]
                 second = instructions[1]
 
-                # Compone adecuadamente según el tipo de instrucción
                 if first.startswith("apply(") and second.startswith("lambda"):
                     return f"lambda x: ({second})({first}(x))"
                 elif first.startswith("lambda") and second.startswith("lambda"):
@@ -286,6 +293,64 @@ def traduce_to_lambda(node, lambda_state=[], current_lambda=""):
                 return f"lambda x: {result}"
 
 
+def traduce_print_expression(node, lambda_state):
+    """Traduce una expresión para print, manejando concatenación de strings"""
+
+    if isinstance(node, tuple):
+        tag = node[0]
+
+        if tag == "string":
+            string_value = node[1]
+            if string_value.startswith('"') and string_value.endswith('"'):
+                string_value = string_value[1:-1]
+            return repr(string_value)
+
+        elif tag == "Concat":
+            left = traduce_print_expression(node[1], lambda_state)
+            right = traduce_print_expression(node[2], lambda_state)
+            return f"str({left}) + str({right})"
+
+        elif tag == "binop" and node[1] == "+":
+            left = traduce_print_expression(node[2], lambda_state)
+            right = traduce_print_expression(node[3], lambda_state)
+            return f"str({left}) + str({right})"
+
+        elif tag == "id":
+            var_name = node[1]
+
+            try:
+                var_index = lambda_state.index(var_name)
+                # Construye apply para extraer la variable
+                lambda_parts = []
+                for var in lambda_state:
+                    lambda_parts.append(f"lambda {var}")
+                lambda_vars = ":".join(lambda_parts)
+
+                return f"apply({lambda_vars}: {var_name})(x)"
+            except ValueError:
+                raise Exception(f"Variable '{var_name}' no declarada")
+
+        elif tag == "num":
+            return str(node[1])
+
+        else:
+            if tag == "true":
+                return "True"
+            elif tag == "false":
+                return "False"
+            else:
+                expr = traduce_expression(node)
+                if expr is not None:
+                    return str(expr)
+                else:
+                    raise Exception(
+                        f"No se puede traducir la expresión print con tag '{tag}'"
+                    )
+
+    else:
+        return str(node)
+
+
 def main():
     if len(sys.argv) != 2:
         print("Uso: python translate.py <archivo.imperat>")
@@ -293,24 +358,18 @@ def main():
 
     filename = sys.argv[1]
 
-    # Verifica que el archivo tenga extensión .imperat
     if not filename.endswith(".imperat"):
         print("Error: El archivo debe tener extensión .imperat")
         sys.exit(1)
 
     try:
-        # Lee el contenido del archivo y genera el AST
         with open(filename, "r", encoding="utf-8") as file:
             data = file.read()
             result, decorated = generate_AST(data)
 
-            print(decorated)
-            print()
-
-            # Traduce a lambda cálculo y genera archivo de salida
             code, variables = traduce_to_lambda(decorated)
-            print(f"Codigo es {code}")
-            generate_python_file(filename, code, variables)
+            output_file = generate_python_file(filename, code, variables)
+            print(f"Archivo generado: {output_file}")
 
     except FileNotFoundError:
         print(f"Error: El archivo '{filename}' no existe.")
