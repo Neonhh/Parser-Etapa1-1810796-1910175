@@ -24,17 +24,25 @@ do = lambda exp: lambda f: Z(lift_do(exp)(f))
 """
 
     result_stmnt = 'nil'
-    for _ in range(len(variables)):
+    print_vals = ''
+    print_lambdas = ''
+    for i in range(len(variables)):
         result_stmnt = f'cons(0)({result_stmnt})'
+        print_vals = f"'x{i}' : x{i}, {print_vals}"
+        print_lambdas = f"{print_lambdas}lambda x{i}:"
+
 
     result_stmnt = f'result = program({result_stmnt})'
+    print_stmnt = f'print(apply({print_lambdas}'+"{"+print_vals+"})(result))"
 
 
 
     # Escribe el archivo
     with open(output_filename, "w", encoding="utf-8") as f:
         f.write(preamble)
-        f.write(f"program = {translated_code}")
+        f.write(f"program = {translated_code}\n")
+        f.write(result_stmnt+"\n")
+        f.write(print_stmnt+"\n")
 
     return output_filename
 
@@ -163,7 +171,7 @@ def traduce_to_lambda(node, lambda_state=[], current_lambda=""):
             for var in node[1].symbols.keys():
                 lambda_state.append(var)
             
-            return traduce_to_lambda(node[2][1:],lambda_state,'')[0], lambda_state #El primer elemento tiene el tag declare y no lo necesitamos
+            return traduce_to_lambda(node[2][1:],lambda_state,''), lambda_state #El primer elemento tiene el tag declare y no lo necesitamos
         
         elif tag=="Asig":
             changed_var = node[1][0]
@@ -239,7 +247,8 @@ def main():
             print()
 
             code, variables = traduce_to_lambda(decorated)
-            generate_python_file(filename, code, len(variables))
+            print(f"Codigo es {code}")
+            generate_python_file(filename, code, variables)
 
     except FileNotFoundError:
         print(f"Error: El archivo '{filename}' no existe.")
